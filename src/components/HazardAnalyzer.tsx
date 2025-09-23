@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ApiKeyInput } from '@/components/ApiKeyInput';
+
 import { CategoryBadge } from '@/components/CategoryBadge';
 import { ragService, type AnalysisResult } from '@/lib/ragService';
 import { useToast } from '@/hooks/use-toast';
@@ -90,26 +90,17 @@ export function HazardAnalyzer() {
   const [hazardDescription, setHazardDescription] = useState('');
   const [knowledgeBase, setKnowledgeBase] = useState(DEFAULT_KNOWLEDGE_BASE);
   const [promptTemplate, setPromptTemplate] = useState(DEFAULT_PROMPT);
-  const [apiKey, setApiKey] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const { toast } = useToast();
 
-  const handleApiKeyChange = (newApiKey: string) => {
-    setApiKey(newApiKey);
-    ragService.setApiKey(newApiKey);
-  };
+  // Initialize API key on component mount
+  useEffect(() => {
+    const apiKey = 'YOUR_GOOGLE_AI_API_KEY_HERE'; // Replace with your actual API key
+    ragService.setApiKey(apiKey);
+  }, []);
 
   const handleAnalyze = async () => {
-    if (!apiKey) {
-      toast({
-        title: 'Error',
-        description: 'Please enter your Google AI API key first',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     if (!hazardDescription.trim()) {
       toast({
         title: 'Error',
@@ -176,15 +167,12 @@ export function HazardAnalyzer() {
             <Sparkles className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Safety Hazard RAG Analyzer
+            Safety Intelligence
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Advanced AI-powered safety hazard categorization using Retrieval Augmented Generation
+            Your AI-powered Safety Copilot
           </p>
         </div>
-
-        {/* API Key Section */}
-        <ApiKeyInput onApiKeyChange={handleApiKeyChange} />
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Input Section */}
@@ -275,7 +263,7 @@ export function HazardAnalyzer() {
             <div className="flex gap-3">
               <Button 
                 onClick={handleAnalyze} 
-                disabled={isAnalyzing || !apiKey}
+                disabled={isAnalyzing}
                 className="flex-1 bg-gradient-primary shadow-elegant"
                 size="lg"
               >
