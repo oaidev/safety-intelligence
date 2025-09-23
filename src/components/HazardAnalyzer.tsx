@@ -96,7 +96,7 @@ export function HazardAnalyzer() {
 
   // Initialize API key on component mount
   useEffect(() => {
-    const apiKey = 'YOUR_GOOGLE_AI_API_KEY_HERE'; // Replace with your actual API key
+    const apiKey = 'AIzaSyBTa_fNTfYBHEdUbNk-5HgPT2pVrE8fcpk'; // Replace with your actual API key
     ragService.setApiKey(apiKey);
   }, []);
 
