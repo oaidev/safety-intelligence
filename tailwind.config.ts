@@ -47,6 +47,32 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        category: {
+          vehicle: "hsl(var(--category-vehicle))",
+          operation: "hsl(var(--category-operation))",
+          loto: "hsl(var(--category-loto))",
+          height: "hsl(var(--category-height))",
+          confined: "hsl(var(--category-confined))",
+          lifting: "hsl(var(--category-lifting))",
+          excavation: "hsl(var(--category-excavation))",
+          blasting: "hsl(var(--category-blasting))",
+          water: "hsl(var(--category-water))",
+          disposal: "hsl(var(--category-disposal))",
+          clearing: "hsl(var(--category-clearing))",
+          safe: "hsl(var(--category-safe))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -62,6 +88,20 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        elegant: "var(--shadow-elegant)",
+        card: "var(--shadow-card)",
+        float: "var(--shadow-float)",
+      },
+      backgroundImage: {
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-accent": "var(--gradient-accent)",
+        "gradient-hero": "var(--gradient-hero)",
+      },
+      transitionTimingFunction: {
+        smooth: "var(--transition-smooth)",
+        bounce: "var(--transition-bounce)",
       },
       keyframes: {
         "accordion-down": {
