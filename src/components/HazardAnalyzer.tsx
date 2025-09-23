@@ -112,6 +112,7 @@ export function HazardAnalyzer() {
 
     setIsAnalyzing(true);
     try {
+      console.log('Starting hazard analysis...');
       ragService.clearKnowledgeBase(); // Clear previous knowledge base
       const analysisResult = await ragService.analyzeHazard(
         hazardDescription,
@@ -121,13 +122,15 @@ export function HazardAnalyzer() {
       setResult(analysisResult);
       toast({
         title: 'Analysis Complete',
-        description: `Processing completed in ${analysisResult.processingTime}ms`,
+        description: `Hazard categorized as: ${analysisResult.category} (${analysisResult.processingTime}ms)`,
       });
+      console.log('Analysis completed successfully:', analysisResult);
     } catch (error) {
       console.error('Analysis error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: 'Analysis Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description: `${errorMessage}. Check console for details.`,
         variant: 'destructive',
       });
     } finally {

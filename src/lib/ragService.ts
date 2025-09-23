@@ -45,6 +45,8 @@ class RagService {
       throw new Error('API key not set');
     }
 
+    console.log('Generating embedding for text:', text.substring(0, 100) + '...');
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${this.apiKey}`,
       {
@@ -61,11 +63,16 @@ class RagService {
       }
     );
 
+    console.log('Embedding API response status:', response.status);
+
     if (!response.ok) {
-      throw new Error(`Embedding API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Embedding API error details:', errorText);
+      throw new Error(`Embedding API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data: EmbeddingResponse = await response.json();
+    console.log('Embedding generated successfully');
     return data.embedding.values;
   }
 
@@ -74,6 +81,8 @@ class RagService {
     if (!this.apiKey) {
       throw new Error('API key not set');
     }
+
+    console.log('Generating text with prompt length:', prompt.length);
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`,
@@ -96,11 +105,22 @@ class RagService {
       }
     );
 
+    console.log('Generation API response status:', response.status);
+
     if (!response.ok) {
-      throw new Error(`Generation API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Generation API error details:', errorText);
+      throw new Error(`Generation API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data: GenerationResponse = await response.json();
+    console.log('Text generated successfully');
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error('No candidates in response:', data);
+      throw new Error('No response generated from API');
+    }
+
     return data.candidates[0]?.content.parts[0]?.text || 'No response generated';
   }
 
