@@ -299,18 +299,21 @@ class MultiRagService {
     }
   }
 
-  // Analyze hazard against all knowledge bases
+  // Analyze hazard against all knowledge bases (optimized)
   async analyzeHazardAll(hazardDescription: string): Promise<MultiAnalysisResult> {
     const startTime = Date.now();
-    console.log('[MultiRAG] Starting multi-knowledge base analysis...');
+    console.log('[MultiRAG] Starting optimized multi-knowledge base analysis...');
+
+    // Pre-compute user embedding once
+    const userEmbedding = await this.generateEmbedding(hazardDescription);
 
     const results: AnalysisResult[] = [];
     const errors: string[] = [];
 
-    // Process all knowledge bases in parallel
+    // Process all knowledge bases in parallel with pre-computed embedding
     const promises = Object.keys(KNOWLEDGE_BASES).map(async (knowledgeBaseId) => {
       try {
-        return await this.analyzeHazardSingle(hazardDescription, knowledgeBaseId);
+        return await this.analyzeHazardSingleOptimized(hazardDescription, knowledgeBaseId, userEmbedding);
       } catch (error) {
         const errorMessage = `${KNOWLEDGE_BASES[knowledgeBaseId].name}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         errors.push(errorMessage);
@@ -332,7 +335,7 @@ class MultiRagService {
 
     const totalProcessingTime = Date.now() - startTime;
 
-    console.log(`[MultiRAG] Multi-analysis completed in ${totalProcessingTime}ms`);
+    console.log(`[MultiRAG] Optimized multi-analysis completed in ${totalProcessingTime}ms`);
     console.log(`[MultiRAG] Successful analyses: ${results.length}, Errors: ${errors.length}`);
 
     return {
@@ -341,6 +344,99 @@ class MultiRagService {
       hasErrors: errors.length > 0,
       errors,
     };
+  }
+
+  // Optimized single analysis using pre-computed embedding
+  private async analyzeHazardSingleOptimized(
+    hazardDescription: string,
+    knowledgeBaseId: string,
+    userEmbedding: number[]
+  ): Promise<AnalysisResult> {
+    const startTime = Date.now();
+    const config = KNOWLEDGE_BASES[knowledgeBaseId];
+
+    try {
+      console.log(`[MultiRAG] Starting optimized analysis for ${config.name}`);
+
+      // Process knowledge base if not already done
+      if (!this.knowledgeBases.has(knowledgeBaseId)) {
+        await this.processKnowledgeBase(knowledgeBaseId);
+      }
+
+      // Retrieve relevant context using pre-computed embedding
+      const retrievedContext = await this.retrieveContextOptimized(userEmbedding, knowledgeBaseId);
+
+      // Build context string
+      const contextText = retrievedContext
+        .map((chunk, index) => `Context ${index + 1}: ${chunk.text}`)
+        .join('\n\n');
+
+      // Replace placeholders in prompt template
+      const finalPrompt = config.promptTemplate
+        .replace('{RETRIEVED_CONTEXT}', contextText)
+        .replace('{USER_INPUT}', hazardDescription);
+
+      // Generate response
+      const fullResponse = await this.generateText(finalPrompt);
+
+      // Parse response
+      const categoryMatch = fullResponse.match(/KATEGORI(?:\s+\w+)?:\s*(.+?)(?:\n|$)/i);
+      const confidenceMatch = fullResponse.match(/CONFIDENCE:\s*(.+?)(?:\n|$)/i);
+      const reasoningMatch = fullResponse.match(/ALASAN:\s*(.+?)$/is);
+
+      const category = categoryMatch?.[1]?.trim() || 'Unknown';
+      const confidence = confidenceMatch?.[1]?.trim() || 'Unknown';
+      const reasoning = reasoningMatch?.[1]?.trim() || 'No reasoning provided';
+
+      const processingTime = Date.now() - startTime;
+
+      console.log(`[MultiRAG] Optimized analysis completed for ${config.name} in ${processingTime}ms`);
+
+      return {
+        knowledgeBaseId,
+        knowledgeBaseName: config.name,
+        category,
+        confidence,
+        reasoning,
+        retrievedContext,
+        fullResponse,
+        processingTime,
+        color: config.color,
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      console.error(`[MultiRAG] Optimized analysis failed for ${config.name}:`, error);
+      throw new Error(`Analysis failed for ${config.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Optimized context retrieval using pre-computed embedding
+  private async retrieveContextOptimized(
+    queryEmbedding: number[],
+    knowledgeBaseId: string,
+    topK: number = 3
+  ): Promise<DocumentChunk[]> {
+    const chunks = this.knowledgeBases.get(knowledgeBaseId);
+    if (!chunks || chunks.length === 0) {
+      throw new Error(`Knowledge base not processed: ${knowledgeBaseId}`);
+    }
+
+    try {
+      const scoredChunks = chunks
+        .filter(chunk => chunk.embedding)
+        .map(chunk => ({
+          ...chunk,
+          similarity: this.cosineSimilarity(queryEmbedding, chunk.embedding!),
+        }))
+        .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+        .slice(0, topK);
+
+      console.log(`[MultiRAG] Retrieved ${scoredChunks.length} relevant chunks from ${knowledgeBaseId} (optimized)`);
+      return scoredChunks;
+    } catch (error) {
+      console.error(`[MultiRAG] Error retrieving context from ${knowledgeBaseId}:`, error);
+      return chunks.slice(0, topK);
+    }
   }
 
   // Get knowledge base configuration

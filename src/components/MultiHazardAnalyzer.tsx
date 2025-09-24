@@ -156,148 +156,62 @@ export function MultiHazardAnalyzer() {
             <Sparkles className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Multi-Knowledge Safety Intelligence
+            Safety Intelligence
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Comprehensive AI-powered safety analysis across multiple knowledge bases
+            Your AI-powered Safety Copilot
           </p>
         </div>
 
-        <Tabs defaultValue="analysis" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
-            <TabsTrigger value="analysis" className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Analysis
-            </TabsTrigger>
-            <TabsTrigger value="results" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Results
-            </TabsTrigger>
-          </TabsList>
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Input Section */}
+          <div className="space-y-6">
+            <HazardInput 
+              hazardDescription={hazardDescription}
+              onHazardDescriptionChange={setHazardDescription}
+            />
 
-          <TabsContent value="analysis">
-            <div className="grid lg:grid-cols-2 gap-8">
-              {/* Input Section */}
-              <div className="space-y-6">
-                <HazardInput 
-                  hazardDescription={hazardDescription}
-                  onHazardDescriptionChange={setHazardDescription}
-                />
-
-                <KnowledgeBaseSelector
-                  selectedKnowledgeBase={selectedKnowledgeBase}
-                  onKnowledgeBaseChange={setSelectedKnowledgeBase}
-                />
-
-                <PromptEditor
-                  selectedKnowledgeBase={selectedKnowledgeBase}
-                  customPrompt={customPrompt}
-                  onCustomPromptChange={setCustomPrompt}
-                />
-
-                {/* Action Buttons */}
-                <div className="space-y-3">
-                  <Button 
-                    onClick={handleAnalyzeAll} 
-                    disabled={isAnalyzing}
-                    className="w-full bg-gradient-primary shadow-elegant"
-                    size="lg"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                        Analyzing All Knowledge Bases...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-5 w-5 mr-2" />
-                        Analyze All Knowledge Bases
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={handleAnalyzeSingle} 
-                      disabled={isAnalyzing}
-                      variant="outline"
-                      className="flex-1"
-                      size="lg"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="h-4 w-4 mr-2" />
-                          Analyze Selected Only
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Button 
-                      onClick={resetForm}
-                      variant="outline"
-                      size="lg"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Results Preview */}
-              <div className="space-y-6">
-                <AnalysisResults 
-                  results={results} 
-                  isAnalyzing={isAnalyzing} 
-                />
-                
-                {singleResult && (
-                  <div className="space-y-4">
-                    <Separator />
-                    <h3 className="text-lg font-semibold">Single Knowledge Base Result</h3>
-                    <AnalysisResults 
-                      results={{
-                        results: [singleResult],
-                        totalProcessingTime: singleResult.processingTime,
-                        hasErrors: false,
-                        errors: []
-                      }}
-                      isAnalyzing={false}
-                    />
-                  </div>
+            {/* Action Button */}
+            <div className="space-y-3">
+              <Button 
+                onClick={handleAnalyzeAll} 
+                disabled={isAnalyzing}
+                className="w-full bg-gradient-primary shadow-elegant"
+                size="lg"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-5 w-5 mr-2" />
+                    Analyze
+                  </>
                 )}
-              </div>
-            </div>
-          </TabsContent>
+              </Button>
 
-          <TabsContent value="results" className="space-y-6">
+              <Button 
+                onClick={resetForm}
+                variant="outline"
+                size="lg"
+                className="w-full"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset
+              </Button>
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="space-y-6">
             <AnalysisResults 
               results={results} 
               isAnalyzing={isAnalyzing} 
             />
-            
-            {singleResult && (
-              <div className="space-y-4">
-                <Separator />
-                <h3 className="text-lg font-semibold">Latest Single Analysis</h3>
-                <AnalysisResults 
-                  results={{
-                    results: [singleResult],
-                    totalProcessingTime: singleResult.processingTime,
-                    hasErrors: false,
-                    errors: []
-                  }}
-                  isAnalyzing={false}
-                />
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
     </div>
   );

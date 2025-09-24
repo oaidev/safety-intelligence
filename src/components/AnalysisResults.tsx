@@ -121,67 +121,6 @@ export function AnalysisResults({ results, isAnalyzing }: AnalysisResultsProps) 
 
   return (
     <div className="space-y-6">
-      {/* Summary Card */}
-      <Card className="shadow-card animate-fade-in">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Analysis Summary
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportResults}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                {results.totalProcessingTime}ms
-              </div>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-success">{results.results.length}</div>
-              <div className="text-sm text-muted-foreground">Successful</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-destructive">{results.errors.length}</div>
-              <div className="text-sm text-muted-foreground">Errors</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">3</div>
-              <div className="text-sm text-muted-foreground">Knowledge Bases</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-info">
-                {Math.round(results.totalProcessingTime / 1000 * 100) / 100}s
-              </div>
-              <div className="text-sm text-muted-foreground">Total Time</div>
-            </div>
-          </div>
-
-          {results.hasErrors && (
-            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <span className="font-medium text-destructive">Analysis Errors</span>
-              </div>
-              <ul className="text-sm text-destructive space-y-1">
-                {results.errors.map((error, index) => (
-                  <li key={index}>• {error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Individual Results */}
       {results.results.map((result, index) => (
@@ -263,48 +202,6 @@ function SingleAnalysisResult({
           <p className="text-sm text-muted-foreground leading-relaxed">{result.reasoning}</p>
         </div>
 
-        <Separator />
-
-        {/* Retrieved Context */}
-        <div>
-          <h4 className="font-medium mb-3">Retrieved Context</h4>
-          <div className="space-y-3">
-            {result.retrievedContext.map((chunk, chunkIndex) => (
-              <div key={chunkIndex} className="p-3 bg-muted/30 rounded-lg space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">
-                    Context {chunkIndex + 1}
-                  </Badge>
-                  {chunk.similarity && (
-                    <Badge variant="secondary">
-                      {(chunk.similarity * 100).toFixed(1)}% match
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm leading-relaxed">{chunk.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Full Response */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium">Full AI Response</h4>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onCopy(result.fullResponse)}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-          </div>
-          <pre className="text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-lg overflow-auto max-h-64">
-            {result.fullResponse}
-          </pre>
-        </div>
       </CardContent>
     </Card>
   );
