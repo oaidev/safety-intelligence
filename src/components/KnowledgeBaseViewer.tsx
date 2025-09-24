@@ -31,9 +31,6 @@ export function KnowledgeBaseViewer({ open, onOpenChange }: KnowledgeBaseViewerP
                   >
                     {config.name}
                   </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {config.content.split('\n').filter(line => line.trim()).length} items
-                  </span>
                 </div>
                 
                 <div className="bg-muted/30 p-4 rounded-lg">
