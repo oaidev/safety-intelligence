@@ -1,24 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { HazardInput } from '@/components/HazardInput';
-import { KnowledgeBaseSelector } from '@/components/KnowledgeBaseSelector';
-import { PromptEditor } from '@/components/PromptEditor';
 import { AnalysisResults } from '@/components/AnalysisResults';
+import { KnowledgeBaseViewer } from '@/components/KnowledgeBaseViewer';
+import { PromptViewer } from '@/components/PromptViewer';
+import { AnalysisLoadingAnimation } from '@/components/AnalysisLoadingAnimation';
 
 import { multiRagService, type MultiAnalysisResult, type AnalysisResult } from '@/lib/multiRagService';
 import { KNOWLEDGE_BASES } from '@/lib/knowledgeBase';
 import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles,
-  Search,
   RefreshCw,
   RotateCcw,
   Zap,
-  Target,
-  Database
+  Database,
+  MessageSquare,
+  Eye
 } from 'lucide-react';
 
 export function MultiHazardAnalyzer() {
@@ -28,6 +29,8 @@ export function MultiHazardAnalyzer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<MultiAnalysisResult | null>(null);
   const [singleResult, setSingleResult] = useState<AnalysisResult | null>(null);
+  const [showKnowledgeBase, setShowKnowledgeBase] = useState(false);
+  const [showPrompts, setShowPrompts] = useState(false);
   const { toast } = useToast();
 
   // Initialize API key on component mount
@@ -155,12 +158,51 @@ export function MultiHazardAnalyzer() {
           <div className="inline-flex items-center justify-center p-3 bg-gradient-primary rounded-full shadow-elegant">
             <Sparkles className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Safety Intelligence
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Your AI-powered Safety Copilot
-          </p>
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              Safety Intelligence
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Your AI-powered Safety Copilot
+            </p>
+            
+            {/* Quick Access Icons */}
+            <TooltipProvider>
+              <div className="flex items-center justify-center gap-4 mt-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowKnowledgeBase(true)}
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <Database className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View Complete Knowledge Bases</p>
+                  </TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPrompts(true)}
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <MessageSquare className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View Prompt Templates</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
@@ -206,12 +248,26 @@ export function MultiHazardAnalyzer() {
 
           {/* Results */}
           <div className="space-y-6">
-            <AnalysisResults 
-              results={results} 
-              isAnalyzing={isAnalyzing} 
-            />
+            {isAnalyzing ? (
+              <AnalysisLoadingAnimation />
+            ) : (
+              <AnalysisResults 
+                results={results} 
+                isAnalyzing={isAnalyzing} 
+              />
+            )}
           </div>
         </div>
+        
+        {/* Popups */}
+        <KnowledgeBaseViewer 
+          open={showKnowledgeBase} 
+          onOpenChange={setShowKnowledgeBase} 
+        />
+        <PromptViewer 
+          open={showPrompts} 
+          onOpenChange={setShowPrompts} 
+        />
       </div>
     </div>
   );
