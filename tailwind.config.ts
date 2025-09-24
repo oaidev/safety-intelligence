@@ -73,6 +73,11 @@ export default {
           clearing: "hsl(var(--category-clearing))",
           safe: "hsl(var(--category-safe))",
         },
+        kb: {
+          golden: "hsl(var(--kb-golden))",
+          pspp: "hsl(var(--kb-pspp))",
+          tbc: "hsl(var(--kb-tbc))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

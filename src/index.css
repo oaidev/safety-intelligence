@@ -59,6 +59,11 @@
     --category-clearing: 120 70% 40%;
     --category-safe: 142 76% 36%;
 
+    /* Multi-Knowledge Base Colors */
+    --kb-golden: 210 85% 45%;
+    --kb-pspp: 48 96% 53%;
+    --kb-tbc: 142 76% 36%;
+
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(210 85% 35%));
     --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(35 95% 45%));
