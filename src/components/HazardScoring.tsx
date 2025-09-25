@@ -120,28 +120,6 @@ export function HazardScoring({ analysis, onImproveReport, onExportReport }: Haz
             </p>
           </div>
           
-          <div className="flex gap-2 justify-center">
-            {onImproveReport && (
-              <Button 
-                onClick={() => onImproveReport(analysis.suggested_improvements)}
-                className="gap-2"
-                variant="outline"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Terapkan Saran
-              </Button>
-            )}
-            {onExportReport && (
-              <Button 
-                onClick={onExportReport}
-                className="gap-2"
-                variant="outline"
-              >
-                <FileDown className="h-4 w-4" />
-                Export PDF
-              </Button>
-            )}
-          </div>
         </CardContent>
       </Card>
 
