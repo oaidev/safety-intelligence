@@ -31,7 +31,7 @@ const hazardFormSchema = z.object({
 type HazardFormData = z.infer<typeof hazardFormSchema>;
 
 interface ComprehensiveHazardFormProps {
-  onSubmit: (data: { description: string; formData: HazardFormData }) => void;
+  onSubmit: (data: { description: string; formData: HazardFormData & { uploadedImage?: string } }) => void;
   isSubmitting?: boolean;
 }
 
@@ -148,7 +148,15 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
     return () => subscription.unsubscribe();
   }, [form]);
 
-  const handleFormSubmit = (data: HazardFormData) => {
+  const handleFormSubmit = async (data: HazardFormData) => {
+    // Convert uploaded files to base64
+    let uploadedImage = undefined;
+    if (uploadedFiles.length > 0) {
+      const file = uploadedFiles[0];
+      const base64 = await convertFileToBase64(file);
+      uploadedImage = base64;
+    }
+
     // Combine critical fields for RAG analysis
     const combinedDescription = `
 Ketidaksesuaian: ${data.nonCompliance}
@@ -158,7 +166,21 @@ Deskripsi Temuan: ${data.findingDescription}
 
     onSubmit({
       description: combinedDescription,
-      formData: data
+      formData: { ...data, uploadedImage }
+    });
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data:image/jpeg;base64, prefix
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = error => reject(error);
     });
   };
 

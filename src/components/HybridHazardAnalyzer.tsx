@@ -142,7 +142,7 @@ export function HybridHazardAnalyzer() {
     
     // Convert form data to the format expected by scoring service
     const scoringFormData = {
-      deskripsi_temuan: formData.hazardDescription || '',
+      deskripsi_temuan: formData.findingDescription || '',
       ketidaksesuaian: formData.nonCompliance || '',
       sub_ketidaksesuaian: formData.subNonCompliance || '',
       tools_pengamatan: formData.observationTool || '',
