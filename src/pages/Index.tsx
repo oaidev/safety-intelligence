@@ -1,7 +1,7 @@
-import { MultiHazardAnalyzer } from "@/components/MultiHazardAnalyzer";
+import { OptimizedHazardAnalyzer } from "@/components/OptimizedHazardAnalyzer";
 
 const Index = () => {
-  return <MultiHazardAnalyzer />;
+  return <OptimizedHazardAnalyzer />;
 };
 
 export default Index;

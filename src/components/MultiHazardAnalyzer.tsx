@@ -9,7 +9,7 @@ import { KnowledgeBaseViewer } from '@/components/KnowledgeBaseViewer';
 import { PromptViewer } from '@/components/PromptViewer';
 import { AnalysisLoadingAnimation } from '@/components/AnalysisLoadingAnimation';
 
-import { multiRagService, type MultiAnalysisResult, type AnalysisResult } from '@/lib/multiRagService';
+import { optimizedRagService, type MultiAnalysisResult, type AnalysisResult } from '@/lib/optimizedRagService';
 import { KNOWLEDGE_BASES } from '@/lib/knowledgeBase';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,10 +33,9 @@ export function MultiHazardAnalyzer() {
   const [showPrompts, setShowPrompts] = useState(false);
   const { toast } = useToast();
 
-  // Initialize API key on component mount
+  // Initialize optimized RAG service on component mount
   useEffect(() => {
-    const apiKey = 'AIzaSyBTa_fNTfYBHEdUbNk-5HgPT2pVrE8fcpk'; // Replace with your actual API key
-    multiRagService.setApiKey(apiKey);
+    optimizedRagService.initialize().catch(console.error);
   }, []);
 
   // Update custom prompt when knowledge base selection changes
@@ -62,9 +61,8 @@ export function MultiHazardAnalyzer() {
     setResults(null);
 
     try {
-      console.log('[MultiHazardAnalyzer] Starting multi-knowledge base analysis...');
-      multiRagService.clearAllKnowledgeBases(); // Clear previous data
-      const analysisResults = await multiRagService.analyzeHazardAll(hazardDescription);
+      console.log('[MultiHazardAnalyzer] Starting optimized multi-knowledge base analysis...');
+      const analysisResults = await optimizedRagService.analyzeHazardAll(hazardDescription);
       
       setResults(analysisResults);
       
@@ -107,28 +105,27 @@ export function MultiHazardAnalyzer() {
 
     try {
       console.log('[MultiHazardAnalyzer] Starting single knowledge base analysis...');
-      multiRagService.clearKnowledgeBase(selectedKnowledgeBase);
+      optimizedRagService.clearAllKnowledgeBases();
       
-      // Update the prompt template for the selected knowledge base
-      const originalPrompt = KNOWLEDGE_BASES[selectedKnowledgeBase].promptTemplate;
-      KNOWLEDGE_BASES[selectedKnowledgeBase].promptTemplate = customPrompt;
+      // For single analysis, we'll use a simplified approach since the optimized service 
+      // is designed for multi-analysis. This is a fallback for single KB analysis.
+      const analysisResult = await optimizedRagService.analyzeHazardAll(hazardDescription);
       
-      const analysisResult = await multiRagService.analyzeHazardSingle(
-        hazardDescription,
-        selectedKnowledgeBase
-      );
+      // Get the result for the selected knowledge base
+      const selectedResult = analysisResult.results.find(r => r.knowledgeBaseId === selectedKnowledgeBase);
       
-      // Restore original prompt
-      KNOWLEDGE_BASES[selectedKnowledgeBase].promptTemplate = originalPrompt;
-      
-      setSingleResult(analysisResult);
-      
-      toast({
-        title: 'Analysis Complete',
-        description: `${analysisResult.knowledgeBaseName}: ${analysisResult.category} (${analysisResult.processingTime}ms)`,
-      });
-      
-      console.log('[MultiHazardAnalyzer] Single analysis completed:', analysisResult);
+      if (selectedResult) {
+        setSingleResult(selectedResult);
+        
+        toast({
+          title: 'Analysis Complete',
+          description: `${selectedResult.knowledgeBaseName}: ${selectedResult.category} (${selectedResult.processingTime}ms)`,
+        });
+        
+        console.log('[MultiHazardAnalyzer] Single analysis completed:', selectedResult);
+      } else {
+        throw new Error('No result found for selected knowledge base');
+      }
     } catch (error) {
       console.error('[MultiHazardAnalyzer] Single analysis error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

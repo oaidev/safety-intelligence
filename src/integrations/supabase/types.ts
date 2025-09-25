@@ -167,6 +167,15 @@ export type Database = {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
       }
+      similarity_search: {
+        Args: { kb_id: string; match_count?: number; query_embedding: string }
+        Returns: {
+          chunk_text: string
+          id: string
+          knowledge_base_id: string
+          similarity: number
+        }[]
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown

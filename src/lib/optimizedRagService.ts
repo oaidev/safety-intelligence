@@ -17,6 +17,7 @@ export interface AnalysisResult {
   confidence: string;
   reasoning: string;
   retrievedContext: DocumentChunk[];
+  fullResponse: string; // Added missing property
   color: string;
   processingTime: number;
 }
@@ -70,7 +71,7 @@ class OptimizedRagService {
     console.log(`[OptimizedRAG] Generating local embedding for text: ${text.substring(0, 100)}...`);
     
     const result = await this.embeddingModel(text, { pooling: 'mean', normalize: true });
-    const embedding = Array.from(result.data);
+    const embedding = Array.from(result.data) as number[];
     
     console.log(`[OptimizedRAG] Generated embedding with dimension: ${embedding.length}`);
     return embedding;
@@ -169,10 +170,10 @@ class OptimizedRagService {
       // Convert embedding array to pgvector format
       const embeddingString = `[${queryEmbedding.join(',')}]`;
       
-      // Use pgvector's cosine similarity search
-      const { data, error } = await supabase.rpc('similarity_search', {
+      // Use pgvector's cosine similarity search with proper typing
+      const { data, error } = await supabase.rpc('similarity_search' as any, {
         query_embedding: embeddingString,
-        knowledge_base_id: knowledgeBaseId,
+        kb_id: knowledgeBaseId, // Updated parameter name to match function
         match_count: topK
       });
       
@@ -198,12 +199,12 @@ class OptimizedRagService {
         }));
       }
       
-      const results = (data || []).map((chunk: any) => ({
+      const results = Array.isArray(data) ? data.map((chunk: any) => ({
         id: chunk.id,
         text: chunk.chunk_text,
         knowledgeBaseId: chunk.knowledge_base_id,
         similarity: chunk.similarity || 0,
-      }));
+      })) : [];
       
       console.log(`[OptimizedRAG] Retrieved ${results.length} similar chunks for ${knowledgeBaseId}`);
       return results;
@@ -280,6 +281,7 @@ class OptimizedRagService {
       const results: AnalysisResult[] = batchResponse.results.map((result: any, index: number) => ({
         ...result,
         retrievedContext: contextResults[index].context,
+        fullResponse: `KATEGORI: ${result.category}\nCONFIDENCE: ${result.confidence}\nALASAN: ${result.reasoning}`, // Reconstruct full response
       }));
 
       const totalProcessingTime = Date.now() - startTime;
