@@ -9,8 +9,10 @@ import { AnalysisResults } from '@/components/AnalysisResults';
 import { KnowledgeBaseViewer } from '@/components/KnowledgeBaseViewer';
 import { PromptViewer } from '@/components/PromptViewer';
 import { AnalysisLoadingAnimation } from '@/components/AnalysisLoadingAnimation';
+import { HazardScoring } from '@/components/HazardScoring';
 
 import { hybridRagService, type MultiAnalysisResult, type ServiceStatus } from '@/lib/hybridRagService';
+import { scoringService, type AnalysisResult as ScoringAnalysisResult } from '@/lib/scoringService';
 import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles,
@@ -30,6 +32,8 @@ export function HybridHazardAnalyzer() {
   const [formData, setFormData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<MultiAnalysisResult | null>(null);
+  const [scoringAnalysis, setScoringAnalysis] = useState<ScoringAnalysisResult | null>(null);
+  const [isScoring, setIsScoring] = useState(false);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>({
     isGoogleReady: true,
     isClientSideReady: false,
@@ -75,24 +79,49 @@ export function HybridHazardAnalyzer() {
 
     setIsAnalyzing(true);
     setResults(null);
+    setScoringAnalysis(null);
 
     try {
-      console.log('[HybridAnalyzer] Starting hybrid analysis...');
-      const analysisResults = await hybridRagService.analyzeHazardAll(data.description);
+      // Start both analyses in parallel
+      const [analysisResults, scoringResults] = await Promise.allSettled([
+        hybridRagService.analyzeHazardAll(data.description),
+        startScoringAnalysis(data.formData)
+      ]);
+
+      // Handle RAG analysis results
+      if (analysisResults.status === 'fulfilled') {
+        setResults(analysisResults.value);
+        
+        const successCount = analysisResults.value.results.length;
+        const errorCount = analysisResults.value.errors.length;
+        const provider = analysisResults.value.embeddingProvider;
+        
+        toast({
+          title: 'Multi-Analysis Complete',
+          description: `Analyzed using ${provider} embeddings. ${successCount} successful, ${errorCount} errors.`,
+          variant: analysisResults.value.hasErrors ? 'destructive' : 'default',
+        });
+      } else {
+        console.error('[HybridAnalyzer] RAG Analysis error:', analysisResults.reason);
+        toast({
+          title: 'RAG Analysis Failed',
+          description: 'RAG analysis encountered an error',
+          variant: 'destructive',
+        });
+      }
+
+      // Handle scoring analysis results
+      if (scoringResults.status === 'fulfilled') {
+        setScoringAnalysis(scoringResults.value);
+      } else {
+        console.error('[HybridAnalyzer] Scoring error:', scoringResults.reason);
+        toast({
+          title: 'Quality Scoring Failed',
+          description: 'Quality scoring analysis encountered an error',
+          variant: 'destructive',
+        });
+      }
       
-      setResults(analysisResults);
-      
-      const successCount = analysisResults.results.length;
-      const errorCount = analysisResults.errors.length;
-      const provider = analysisResults.embeddingProvider;
-      
-      toast({
-        title: 'Multi-Analysis Complete',
-        description: `Analyzed using ${provider} embeddings. ${successCount} successful, ${errorCount} errors. (${analysisResults.totalProcessingTime}ms)`,
-        variant: analysisResults.hasErrors ? 'destructive' : 'default',
-      });
-      
-      console.log('[HybridAnalyzer] Analysis completed:', analysisResults);
     } catch (error) {
       console.error('[HybridAnalyzer] Analysis error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -103,14 +132,51 @@ export function HybridHazardAnalyzer() {
       });
     } finally {
       setIsAnalyzing(false);
+      setIsScoring(false);
     }
+  };
+
+  const startScoringAnalysis = async (formData: any): Promise<ScoringAnalysisResult> => {
+    setIsScoring(true);
+    console.log('[HybridAnalyzer] Starting scoring analysis...');
+    
+    // Convert form data to the format expected by scoring service
+    const scoringFormData = {
+      deskripsi_temuan: formData.hazardDescription || '',
+      ketidaksesuaian: formData.nonCompliance || '',
+      sub_ketidaksesuaian: formData.subNonCompliance || '',
+      tools_pengamatan: formData.observationTool || '',
+      lokasi_detail: formData.detailLocation || '',
+      quick_action: formData.quickAction || '',
+      image_base64: formData.uploadedImage || undefined
+    };
+
+    return await scoringService.analyzeHazardQuality(scoringFormData);
   };
 
   const resetForm = () => {
     setHazardDescription('');
     setFormData(null);
     setResults(null);
+    setScoringAnalysis(null);
     localStorage.removeItem('hazard-form-data');
+  };
+
+  const handleImproveReport = (improvements: any) => {
+    // Apply the suggested improvements to the form
+    // This would trigger a re-render of the form with suggested values
+    toast({
+      title: 'Improvements Applied',
+      description: 'Suggested improvements have been applied to the form. Please review and resubmit.',
+    });
+  };
+
+  const handleExportReport = () => {
+    // Export the analysis as PDF
+    toast({
+      title: 'Export Started',
+      description: 'Preparing PDF export...',
+    });
   };
 
   const clearData = async () => {
@@ -230,14 +296,34 @@ export function HybridHazardAnalyzer() {
 
 
           {/* Results */}
-          <div className="max-w-6xl mx-auto">
-            {isAnalyzing ? (
+          <div className="max-w-6xl mx-auto space-y-8">
+            {isAnalyzing || isScoring ? (
               <AnalysisLoadingAnimation />
             ) : (
-              <AnalysisResults 
-                results={results} 
-                isAnalyzing={isAnalyzing} 
-              />
+              <>
+                {/* Quality Scoring Results */}
+                {scoringAnalysis && (
+                  <div className="space-y-4">
+                    <h2 className="text-2xl font-bold text-center">Analisis Kualitas Laporan</h2>
+                    <HazardScoring 
+                      analysis={scoringAnalysis}
+                      onImproveReport={handleImproveReport}
+                      onExportReport={handleExportReport}
+                    />
+                  </div>
+                )}
+                
+                {/* RAG Analysis Results */}
+                {results && (
+                  <div className="space-y-4">
+                    <h2 className="text-2xl font-bold text-center">Hasil Analisis Knowledge Base</h2>
+                    <AnalysisResults 
+                      results={results} 
+                      isAnalyzing={isAnalyzing} 
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

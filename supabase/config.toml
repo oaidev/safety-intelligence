@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.generate-embedding]
 verify_jwt = false
+
+[functions.analyze-hazard-quality]
+verify_jwt = false
