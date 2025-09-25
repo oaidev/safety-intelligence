@@ -18,24 +18,33 @@ export type Database = {
         Row: {
           chunk_index: number
           chunk_text: string
+          client_embedding: string | null
           created_at: string
           embedding: string | null
+          embedding_provider: string | null
+          google_embedding: string | null
           id: string
           knowledge_base_id: string
         }
         Insert: {
           chunk_index: number
           chunk_text: string
+          client_embedding?: string | null
           created_at?: string
           embedding?: string | null
+          embedding_provider?: string | null
+          google_embedding?: string | null
           id?: string
           knowledge_base_id: string
         }
         Update: {
           chunk_index?: number
           chunk_text?: string
+          client_embedding?: string | null
           created_at?: string
           embedding?: string | null
+          embedding_provider?: string | null
+          google_embedding?: string | null
           id?: string
           knowledge_base_id?: string
         }
@@ -169,6 +178,20 @@ export type Database = {
       }
       similarity_search: {
         Args: { kb_id: string; match_count?: number; query_embedding: string }
+        Returns: {
+          chunk_text: string
+          id: string
+          knowledge_base_id: string
+          similarity: number
+        }[]
+      }
+      similarity_search_hybrid: {
+        Args: {
+          kb_id: string
+          match_count?: number
+          provider?: string
+          query_embedding: string
+        }
         Returns: {
           chunk_text: string
           id: string
