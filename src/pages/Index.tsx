@@ -1,7 +1,7 @@
-import { OptimizedHazardAnalyzer } from "@/components/OptimizedHazardAnalyzer";
+import { HybridHazardAnalyzer } from "@/components/HybridHazardAnalyzer";
 
 const Index = () => {
-  return <OptimizedHazardAnalyzer />;
+  return <HybridHazardAnalyzer />;
 };
 
 export default Index;
