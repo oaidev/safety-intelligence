@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { AlertTriangle, Upload, RotateCcw, Send, Building2 } from 'lucide-react';
+import { AlertTriangle, Upload, RotateCcw, Send, Building2, X, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Form schema
@@ -108,6 +108,7 @@ const quickActions = [
 export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: ComprehensiveHazardFormProps) {
   const { toast } = useToast();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const form = useForm<HazardFormData>({
     resolver: zodResolver(hazardFormSchema),
@@ -140,13 +141,15 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
     }
   }, [form]);
 
-  // Save form data to localStorage on changes
+  // Clean up object URLs when component unmounts or files change
   useEffect(() => {
-    const subscription = form.watch((data) => {
-      localStorage.setItem('hazard-form-data', JSON.stringify(data));
-    });
-    return () => subscription.unsubscribe();
-  }, [form]);
+    const urls = uploadedFiles.map(file => URL.createObjectURL(file));
+    setImageUrls(urls);
+    
+    return () => {
+      urls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [uploadedFiles]);
 
   const handleFormSubmit = async (data: HazardFormData) => {
     // Convert uploaded files to base64
@@ -186,7 +189,10 @@ Deskripsi Temuan: ${data.findingDescription}
 
   const handleReset = () => {
     form.reset();
+    // Clean up object URLs before clearing files
+    imageUrls.forEach(url => URL.revokeObjectURL(url));
     setUploadedFiles([]);
+    setImageUrls([]);
     localStorage.removeItem('hazard-form-data');
     toast({
       title: 'Form Reset',
@@ -197,6 +203,14 @@ Deskripsi Temuan: ${data.findingDescription}
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     setUploadedFiles(prev => [...prev, ...files]);
+  };
+
+  const handleDeleteFile = (index: number) => {
+    // Revoke the URL for the deleted file
+    if (imageUrls[index]) {
+      URL.revokeObjectURL(imageUrls[index]);
+    }
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -428,27 +442,69 @@ Deskripsi Temuan: ${data.findingDescription}
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Photo Upload */}
-              <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="photo-upload"
-                />
-                <label htmlFor="photo-upload" className="cursor-pointer">
-                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">Unggah Foto</span> atau drag & drop
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG hingga 10MB
-                  </p>
-                </label>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="photo-upload"
+                  />
+                  <label htmlFor="photo-upload" className="cursor-pointer">
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium">Unggah Foto</span> atau drag & drop
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      PNG, JPG hingga 10MB
+                    </p>
+                  </label>
+                </div>
+
+                {/* Image Previews */}
                 {uploadedFiles.length > 0 && (
-                  <div className="mt-4 text-sm text-muted-foreground">
-                    {uploadedFiles.length} file(s) uploaded
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium">Foto yang diunggah ({uploadedFiles.length})</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {uploadedFiles.map((file, index) => (
+                        <div key={index} className="relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
+                            <img
+                              src={imageUrls[index]}
+                              alt={`Upload ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                window.open(imageUrls[index], '_blank');
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleDeleteFile(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2 truncate">
+                            {file.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
