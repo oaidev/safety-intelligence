@@ -149,39 +149,12 @@ export function HybridHazardAnalyzer() {
           </div>
           <div className="space-y-2">
             <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Hybrid Safety Intelligence
+              Safety Intelligence
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              AI-powered Safety Copilot with Smart Embedding Selection
+              Your AI-powered Safety Copilot
             </p>
             
-            {/* Service Status */}
-            <div className="flex items-center justify-center gap-6 mt-4">
-              <div className="flex items-center gap-2 text-sm">
-                {getProviderIcon()}
-                <span className="text-muted-foreground">Current: {getProviderText()}</span>
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <span className="text-muted-foreground">Google Ready</span>
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm">
-                {serviceStatus.isClientSideReady ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-muted-foreground">Client-side Ready</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-4 w-4 text-orange-500 animate-pulse" />
-                    <span className="text-muted-foreground">Downloading...</span>
-                  </>
-                )}
-              </div>
-            </div>
-
             {/* Client-side Download Progress */}
             {!serviceStatus.isClientSideReady && serviceStatus.clientSideProgress > 0 && (
               <div className="max-w-md mx-auto mt-4 space-y-2">
@@ -255,26 +228,6 @@ export function HybridHazardAnalyzer() {
             isSubmitting={isAnalyzing}
           />
 
-          {/* Provider Info */}
-          <div className="max-w-2xl mx-auto">
-            <div className="p-4 rounded-lg bg-muted/50 border">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getProviderIcon()}
-                  <span className="text-sm font-medium">{getProviderText()}</span>
-                </div>
-                <Badge variant={serviceStatus.currentProvider === 'client-side' ? 'default' : 'secondary'}>
-                  {serviceStatus.currentProvider === 'client-side' ? 'Fast' : 'Standard'}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {serviceStatus.currentProvider === 'client-side' 
-                  ? 'Using local AI model for maximum speed and privacy'
-                  : 'Using Google embeddings with automatic upgrade to local model'
-                }
-              </p>
-            </div>
-          </div>
 
           {/* Results */}
           <div className="max-w-6xl mx-auto">

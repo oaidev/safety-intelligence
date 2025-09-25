@@ -22,7 +22,6 @@ const hazardFormSchema = z.object({
   detailLocation: z.string().optional(),
   areaPjaBC: z.string().min(1, 'Area PJA BC wajib dipilih'),
   areaPjaMitra: z.string().optional(),
-  isKritisArea: z.boolean().default(false),
   nonCompliance: z.string().min(1, 'Ketidaksesuaian wajib dipilih'),
   subNonCompliance: z.string().min(1, 'Sub Ketidaksesuaian wajib dipilih'),
   quickAction: z.string().min(1, 'Quick Action wajib dipilih'),
@@ -121,7 +120,6 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
       detailLocation: '',
       areaPjaBC: '',
       areaPjaMitra: '',
-      isKritisArea: false,
       nonCompliance: '',
       subNonCompliance: '',
       quickAction: '',
@@ -346,9 +344,6 @@ Deskripsi Temuan: ${data.findingDescription}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-muted/30 p-4 rounded-lg text-center text-sm text-muted-foreground">
-                  [Company Logo Placeholder]
-                </div>
                 <FormField
                   control={form.control}
                   name="areaPjaBC"
@@ -436,26 +431,6 @@ Deskripsi Temuan: ${data.findingDescription}
                 )}
               </div>
 
-              {/* Critical Area Checkbox */}
-              <FormField
-                control={form.control}
-                name="isKritisArea"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Apakah laporan berkaitan dengan Observasi Area Kritis?
-                      </FormLabel>
-                    </div>
-                  </FormItem>
-                )}
-              />
 
               {/* Form fields in two columns */}
               <div className="grid md:grid-cols-2 gap-6">
