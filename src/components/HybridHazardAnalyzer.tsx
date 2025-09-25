@@ -4,7 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-import { HazardInput } from '@/components/HazardInput';
+import { ComprehensiveHazardForm } from '@/components/ComprehensiveHazardForm';
 import { AnalysisResults } from '@/components/AnalysisResults';
 import { KnowledgeBaseViewer } from '@/components/KnowledgeBaseViewer';
 import { PromptViewer } from '@/components/PromptViewer';
@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles,
   RefreshCw,
-  RotateCcw,
   Zap,
   Database,
   MessageSquare,
@@ -28,6 +27,7 @@ import {
 
 export function HybridHazardAnalyzer() {
   const [hazardDescription, setHazardDescription] = useState('');
+  const [formData, setFormData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<MultiAnalysisResult | null>(null);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>({
@@ -60,11 +60,14 @@ export function HybridHazardAnalyzer() {
     };
   }, [toast]);
 
-  const handleAnalyzeAll = async () => {
-    if (!hazardDescription.trim()) {
+  const handleFormSubmit = async (data: { description: string; formData: any }) => {
+    setHazardDescription(data.description);
+    setFormData(data.formData);
+    
+    if (!data.description.trim()) {
       toast({
         title: 'Error',
-        description: 'Please enter a hazard description',
+        description: 'Deskripsi temuan wajib diisi',
         variant: 'destructive',
       });
       return;
@@ -75,7 +78,7 @@ export function HybridHazardAnalyzer() {
 
     try {
       console.log('[HybridAnalyzer] Starting hybrid analysis...');
-      const analysisResults = await hybridRagService.analyzeHazardAll(hazardDescription);
+      const analysisResults = await hybridRagService.analyzeHazardAll(data.description);
       
       setResults(analysisResults);
       
@@ -105,7 +108,9 @@ export function HybridHazardAnalyzer() {
 
   const resetForm = () => {
     setHazardDescription('');
+    setFormData(null);
     setResults(null);
+    localStorage.removeItem('hazard-form-data');
   };
 
   const clearData = async () => {
@@ -243,47 +248,15 @@ export function HybridHazardAnalyzer() {
         </div>
 
         {/* Main Interface */}
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Input Section */}
-          <div className="space-y-6">
-            <HazardInput 
-              hazardDescription={hazardDescription}
-              onHazardDescriptionChange={setHazardDescription}
-            />
+        <div className="space-y-8">
+          {/* Comprehensive Form */}
+          <ComprehensiveHazardForm 
+            onSubmit={handleFormSubmit}
+            isSubmitting={isAnalyzing}
+          />
 
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button 
-                onClick={handleAnalyzeAll} 
-                disabled={isAnalyzing}
-                className="w-full bg-gradient-primary shadow-elegant"
-                size="lg"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                    Analyzing with Hybrid AI...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-5 w-5 mr-2" />
-                    Analyze (Hybrid)
-                  </>
-                )}
-              </Button>
-
-              <Button 
-                onClick={resetForm}
-                variant="outline"
-                size="lg"
-                className="w-full"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset
-              </Button>
-            </div>
-
-            {/* Provider Info */}
+          {/* Provider Info */}
+          <div className="max-w-2xl mx-auto">
             <div className="p-4 rounded-lg bg-muted/50 border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -304,7 +277,7 @@ export function HybridHazardAnalyzer() {
           </div>
 
           {/* Results */}
-          <div className="space-y-6">
+          <div className="max-w-6xl mx-auto">
             {isAnalyzing ? (
               <AnalysisLoadingAnimation />
             ) : (
