@@ -59,6 +59,173 @@ export type Database = {
         }
         Relationships: []
       }
+      hazard_action_items: {
+        Row: {
+          alur_permasalahan: string
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          due_date: string
+          hazard_report_id: string
+          id: string
+          jenis_tindakan: string
+          priority_level: string | null
+          status: string
+          tindakan: string
+          updated_at: string
+        }
+        Insert: {
+          alur_permasalahan: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date: string
+          hazard_report_id: string
+          id?: string
+          jenis_tindakan: string
+          priority_level?: string | null
+          status?: string
+          tindakan: string
+          updated_at?: string
+        }
+        Update: {
+          alur_permasalahan?: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string
+          hazard_report_id?: string
+          id?: string
+          jenis_tindakan?: string
+          priority_level?: string | null
+          status?: string
+          tindakan?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hazard_action_items_hazard_report_id_fkey"
+            columns: ["hazard_report_id"]
+            isOneToOne: false
+            referencedRelation: "hazard_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hazard_reports: {
+        Row: {
+          ai_analysis: Json | null
+          alur_permasalahan: string | null
+          area_pja_bc: string | null
+          corrective_actions: string | null
+          created_at: string
+          detail_location: string | null
+          due_date_perbaikan: string | null
+          evaluated_at: string | null
+          evaluated_by: string | null
+          finding_description: string
+          id: string
+          image_base64: string | null
+          image_url: string | null
+          jenis_tindakan: string | null
+          kategori_temuan: string | null
+          konfirmasi: string | null
+          location: string
+          location_description: string | null
+          non_compliance: string
+          observation_tool: string | null
+          pja_mitra_kerja: string | null
+          preventive_measures: string | null
+          quick_action: string
+          reporter_company: string | null
+          reporter_name: string
+          reporter_position: string | null
+          risk_level: string | null
+          root_cause_analysis: string | null
+          similarity_cluster_id: string | null
+          site: string | null
+          status: string
+          sub_non_compliance: string
+          tindakan: string | null
+          tracking_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          alur_permasalahan?: string | null
+          area_pja_bc?: string | null
+          corrective_actions?: string | null
+          created_at?: string
+          detail_location?: string | null
+          due_date_perbaikan?: string | null
+          evaluated_at?: string | null
+          evaluated_by?: string | null
+          finding_description: string
+          id?: string
+          image_base64?: string | null
+          image_url?: string | null
+          jenis_tindakan?: string | null
+          kategori_temuan?: string | null
+          konfirmasi?: string | null
+          location: string
+          location_description?: string | null
+          non_compliance: string
+          observation_tool?: string | null
+          pja_mitra_kerja?: string | null
+          preventive_measures?: string | null
+          quick_action: string
+          reporter_company?: string | null
+          reporter_name: string
+          reporter_position?: string | null
+          risk_level?: string | null
+          root_cause_analysis?: string | null
+          similarity_cluster_id?: string | null
+          site?: string | null
+          status?: string
+          sub_non_compliance: string
+          tindakan?: string | null
+          tracking_id?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          alur_permasalahan?: string | null
+          area_pja_bc?: string | null
+          corrective_actions?: string | null
+          created_at?: string
+          detail_location?: string | null
+          due_date_perbaikan?: string | null
+          evaluated_at?: string | null
+          evaluated_by?: string | null
+          finding_description?: string
+          id?: string
+          image_base64?: string | null
+          image_url?: string | null
+          jenis_tindakan?: string | null
+          kategori_temuan?: string | null
+          konfirmasi?: string | null
+          location?: string
+          location_description?: string | null
+          non_compliance?: string
+          observation_tool?: string | null
+          pja_mitra_kerja?: string | null
+          preventive_measures?: string | null
+          quick_action?: string
+          reporter_company?: string | null
+          reporter_name?: string
+          reporter_position?: string | null
+          risk_level?: string | null
+          root_cause_analysis?: string | null
+          similarity_cluster_id?: string | null
+          site?: string | null
+          status?: string
+          sub_non_compliance?: string
+          tindakan?: string | null
+          tracking_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       knowledge_base_chunks: {
         Row: {
           chunk_index: number

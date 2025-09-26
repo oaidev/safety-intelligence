@@ -84,6 +84,35 @@ export function HybridHazardAnalyzer() {
     setScoringAnalysis(null);
 
     try {
+      // Import hazard report service
+      const { hazardReportService } = await import('@/lib/hazardReportService');
+      
+      // Save hazard report to database first
+      const savedReport = await hazardReportService.saveHazardReport({
+        reporterName: data.formData.reporterName || 'Anonymous',
+        reporterPosition: data.formData.reporterPosition,
+        reporterCompany: data.formData.reporterCompany,
+        site: data.formData.site,
+        location: data.formData.location || 'Unknown',
+        detailLocation: data.formData.detailLocation,
+        locationDescription: data.formData.locationDescription,
+        areaPjaBc: data.formData.areaPjaBc,
+        pjaMitraKerja: data.formData.areaPjaMitra,
+        observationTool: data.formData.observationTool,
+        nonCompliance: data.formData.nonCompliance || 'Unknown',
+        subNonCompliance: data.formData.subNonCompliance || 'Unknown',
+        quickAction: data.formData.quickAction || 'Unknown',
+        findingDescription: data.description,
+        uploadedImage: data.formData.uploadedImage
+      });
+
+      // Show success message with tracking ID
+      toast({
+        title: 'Laporan Berhasil Disimpan',
+        description: `ID Tracking: ${savedReport.tracking_id}${savedReport.similar_reports?.length ? ` | ${savedReport.similar_reports.length} laporan serupa ditemukan` : ''}`,
+        duration: 5000,
+      });
+
       // Start both analyses in parallel
       const [analysisResults, scoringResults] = await Promise.allSettled([
         hybridRagService.analyzeHazardAll(data.description),
