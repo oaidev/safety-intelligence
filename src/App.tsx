@@ -9,6 +9,8 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import EvaluatorDashboard from "./pages/EvaluatorDashboard";
 import HazardEvaluationPage from "./pages/HazardEvaluationPage";
+import RoleSelection from "./pages/RoleSelection";
+import FrontlinerDashboard from "./pages/FrontlinerDashboard";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +21,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<RoleSelection />} />
+          <Route path="/hazard-analyzer" element={<Index />} />
+          <Route path="/frontliner" element={<FrontlinerDashboard />} />
           <Route path="/evaluator" element={<EvaluatorDashboard />} />
           <Route path="/evaluate/:id" element={<HazardEvaluationPage />} />
           <Route path="/settings" element={<Settings />} />
