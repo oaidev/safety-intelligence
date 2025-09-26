@@ -233,25 +233,9 @@ export function HybridHazardAnalyzer() {
               </div>
             )}
             
-            {/* Quick Access Icons */}
+            {/* Quick Access Icons - Only Prompt Template */}
             <TooltipProvider>
               <div className="flex items-center justify-center gap-4 mt-6">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowKnowledgeBase(true)}
-                      className="text-muted-foreground hover:text-primary"
-                    >
-                      <Database className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>View Complete Knowledge Bases</p>
-                  </TooltipContent>
-                </Tooltip>
-                
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -265,39 +249,6 @@ export function HybridHazardAnalyzer() {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>View Prompt Templates</p>
-                  </TooltipContent>
-                </Tooltip>
-                
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link to="/settings">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-primary"
-                      >
-                        <Settings className="h-5 w-5" />
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Manage Knowledge Bases & Settings</p>
-                  </TooltipContent>
-                </Tooltip>
-                
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearData}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <RefreshCw className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clear Vector Database</p>
                   </TooltipContent>
                 </Tooltip>
               </div>

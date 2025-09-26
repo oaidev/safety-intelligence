@@ -50,7 +50,7 @@ export function KnowledgeBaseManager() {
                 Bulk Upload Data
               </CardTitle>
               <CardDescription>
-                Upload large datasets via Excel (.xlsx) or CSV files. Supports up to 18,000 rows with progress tracking.
+                Upload large datasets via Excel (.xlsx) or CSV files. Supports up to 50,000 rows with progress tracking.
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -186,7 +186,7 @@ export function BulkUploadForm() {
         <CardHeader>
           <CardTitle>Upload Knowledge Base Data</CardTitle>
           <CardDescription>
-            Upload up to 18,000 rows. Processing time: ~30-60 minutes for large files.
+            Upload up to 50,000 rows. Processing time: ~30-60 minutes for large files.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
