@@ -253,12 +253,12 @@ export default function EvaluatorDashboard() {
                 </div>
               </div>
               
-              <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+              <Select value={filters.status || 'ALL'} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === 'ALL' ? '' : value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Semua Status</SelectItem>
+                  <SelectItem value="ALL">Semua Status</SelectItem>
                   <SelectItem value="PENDING_REVIEW">Menunggu Review</SelectItem>
                   <SelectItem value="UNDER_EVALUATION">Sedang Evaluasi</SelectItem>
                   <SelectItem value="IN_PROGRESS">Dalam Proses</SelectItem>
