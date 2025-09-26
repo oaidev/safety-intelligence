@@ -52,10 +52,14 @@ serve(async (req) => {
       const individualStartTime = Date.now();
       
       try {
+        // Safely handle undefined values
+        const safeContext = analysis.retrievedContext || 'No relevant context found';
+        const safeHazardDescription = hazardDescription || 'No hazard description provided';
+        
         // Replace placeholders in prompt template
         const finalPrompt = analysis.promptTemplate
-          .replace('{RETRIEVED_CONTEXT}', analysis.retrievedContext)
-          .replace('{USER_INPUT}', hazardDescription);
+          .replace('{RETRIEVED_CONTEXT}', safeContext)
+          .replace('{USER_INPUT}', safeHazardDescription);
 
         console.log(`[BatchAnalysis] Sending request ${index + 1}/${analyses.length} to Gemini API`);
 
@@ -92,7 +96,13 @@ serve(async (req) => {
           throw new Error('No response generated from API');
         }
 
-        const fullResponse = data.candidates[0]?.content.parts[0]?.text || 'No response generated';
+        // Safely access nested properties
+        const candidate = data.candidates[0];
+        if (!candidate || !candidate.content || !candidate.content.parts || !candidate.content.parts[0]) {
+          throw new Error('Invalid response structure from API');
+        }
+        
+        const fullResponse = candidate.content.parts[0].text || 'No response generated';
         
         // Parse response
         const categoryMatch = fullResponse.match(/KATEGORI(?:\s+\w+)?:\s*(.+?)(?:\n|$)/i);
