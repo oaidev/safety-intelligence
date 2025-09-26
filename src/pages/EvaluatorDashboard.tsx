@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from '@/hooks/use-toast';
 import { hazardReportService } from '@/lib/hazardReportService';
 import { similarityService } from '@/lib/similarityService';
+import { ClusterAnalysisDashboard } from '@/components/ClusterAnalysisDashboard';
 import { 
   Search, 
   Filter,
@@ -367,6 +368,9 @@ export default function EvaluatorDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Cluster Analysis Section */}
+        <ClusterAnalysisDashboard />
 
         {/* Report Details Dialog */}
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>

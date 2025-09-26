@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from '@/hooks/use-toast';
 import { hazardReportService } from '@/lib/hazardReportService';
 import { aiRecommendationService } from '@/lib/aiRecommendationService';
+import { SimilarReportsAnalysis } from '@/components/SimilarReportsAnalysis';
 import { 
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -66,6 +67,7 @@ interface HazardReport {
   alur_permasalahan?: string;
   tindakan?: string;
   due_date_perbaikan?: string;
+  similarity_cluster_id?: string;
   similar_reports?: any[];
   hazard_action_items?: any[];
 }
@@ -524,35 +526,22 @@ export default function HazardEvaluationPage() {
           </CardContent>
         </Card>
 
-        {/* Similar Reports Warning */}
-        {report.similar_reports && report.similar_reports.length > 0 && (
-          <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/10">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
-                <AlertTriangle className="h-5 w-5" />
-                Laporan Serupa Ditemukan ({report.similar_reports.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {report.similar_reports.map((similar: any) => (
-                  <div key={similar.id} className="flex items-center justify-between p-3 border border-orange-200 rounded-lg">
-                    <div>
-                      <p className="font-medium">{similar.tracking_id}</p>
-                      <p className="text-sm text-muted-foreground">{similar.location} - {format(new Date(similar.created_at), 'dd MMM yyyy', { locale: idLocale })}</p>
-                    </div>
-                    <Badge variant="outline">Serupa</Badge>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                <p className="text-sm text-orange-800 dark:text-orange-200">
-                  <strong>Perhatian:</strong> Terdapat laporan serupa yang menunjukkan pola berulang. Pertimbangkan untuk mengidentifikasi akar masalah sistemik.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Similarity Analysis */}
+        <SimilarReportsAnalysis 
+          currentReport={{
+            id: report.id,
+            tracking_id: report.tracking_id,
+            reporter_name: report.reporter_name,
+            location: report.location,
+            non_compliance: report.non_compliance,
+            sub_non_compliance: report.sub_non_compliance,
+            finding_description: report.finding_description,
+            status: report.status,
+            created_at: report.created_at,
+            similarity_cluster_id: report.similarity_cluster_id
+          }}
+          onSimilarReportsFound={(count) => console.log(`Found ${count} similar reports`)}
+        />
 
         {/* AI-Powered Evaluation Section */}
         <Card>
