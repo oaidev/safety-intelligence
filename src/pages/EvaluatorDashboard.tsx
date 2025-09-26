@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { hazardReportService } from '@/lib/hazardReportService';
 import { similarityService } from '@/lib/similarityService';
@@ -26,7 +25,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface HazardReport {
   id: string;
@@ -70,10 +69,9 @@ export default function EvaluatorDashboard() {
     dateTo: '',
     category: ''
   });
-  const [selectedReport, setSelectedReport] = useState<HazardReport | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [groupByClusters, setGroupByClusters] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadDashboardData();
@@ -174,19 +172,8 @@ export default function EvaluatorDashboard() {
     return colors[hash % colors.length];
   };
 
-  const handleViewDetails = async (report: HazardReport) => {
-    try {
-      const fullReport = await hazardReportService.getHazardReport(report.id);
-      setSelectedReport(fullReport);
-      setDetailsOpen(true);
-    } catch (error) {
-      console.error('Error loading report details:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load report details',
-        variant: 'destructive',
-      });
-    }
+  const handleViewDetails = (report: HazardReport) => {
+    navigate(`/evaluate/${report.id}`);
   };
 
   const StatCard = ({ title, value, icon: Icon, description, color }: {
@@ -460,7 +447,7 @@ export default function EvaluatorDashboard() {
                                     onClick={() => handleViewDetails(report)}
                                   >
                                     <Eye className="h-4 w-4 mr-1" />
-                                    Detail
+                                    Evaluasi
                                   </Button>
                                 </TableCell>
                               </TableRow>
@@ -527,7 +514,7 @@ export default function EvaluatorDashboard() {
                               onClick={() => handleViewDetails(report)}
                             >
                               <Eye className="h-4 w-4 mr-1" />
-                              Detail
+                              Evaluasi
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -542,125 +529,6 @@ export default function EvaluatorDashboard() {
 
         {/* Cluster Analysis Section */}
         <ClusterAnalysisDashboard />
-
-        {/* Report Details Dialog */}
-        <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Detail Laporan Hazard</DialogTitle>
-              <DialogDescription>
-                {selectedReport && `ID: ${selectedReport.tracking_id}`}
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedReport && (
-              <div className="space-y-6">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Informasi Pelapor</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div><strong>Nama:</strong> {selectedReport.reporter_name}</div>
-                      <div><strong>Tanggal:</strong> {format(new Date(selectedReport.created_at), 'dd MMMM yyyy HH:mm', { locale: idLocale })}</div>
-                      <div><strong>Status:</strong> 
-                        <Badge className="ml-2" variant={getStatusBadgeVariant(selectedReport.status)}>
-                          {getStatusLabel(selectedReport.status)}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Lokasi</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <div><strong>Lokasi:</strong> {selectedReport.location}</div>
-                      <div><strong>Ketidaksesuaian:</strong> {selectedReport.non_compliance}</div>
-                      <div><strong>Sub Kategori:</strong> {selectedReport.sub_non_compliance}</div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Finding Description */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Deskripsi Temuan</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{selectedReport.finding_description}</p>
-                  </CardContent>
-                </Card>
-
-                {/* Similar Reports */}
-                {(selectedReport as any).similar_reports?.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm text-orange-600 flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        Laporan Serupa ({(selectedReport as any).similar_reports.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {(selectedReport as any).similar_reports.map((similar: any) => (
-                          <div key={similar.id} className="text-sm border-l-2 border-orange-200 pl-3">
-                            <div className="font-medium">{similar.tracking_id}</div>
-                            <div className="text-muted-foreground">{similar.location} - {format(new Date(similar.created_at), 'dd MMM', { locale: idLocale })}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Action Items */}
-                {selectedReport.hazard_action_items?.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Tindakan Terkait</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {selectedReport.hazard_action_items.map((action: any) => (
-                          <div key={action.id} className="text-sm border rounded p-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="font-medium">{action.jenis_tindakan}</div>
-                                <div className="text-muted-foreground">{action.tindakan}</div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Due: {format(new Date(action.due_date), 'dd MMM yyyy', { locale: idLocale })}
-                                </div>
-                              </div>
-                              <Badge variant={action.status === 'COMPLETED' ? 'default' : 'outline'}>
-                                {action.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-4">
-                  <Link to={`/evaluate/${selectedReport.id}`}>
-                    <Button>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Evaluasi Laporan
-                    </Button>
-                  </Link>
-                  <Button variant="outline" onClick={() => setDetailsOpen(false)}>
-                    Tutup
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );
