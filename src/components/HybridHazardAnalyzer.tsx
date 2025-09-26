@@ -222,6 +222,32 @@ export function HybridHazardAnalyzer() {
     }
   };
 
+  const forceRepopulate = async () => {
+    try {
+      // Import optimized RAG service
+      const { optimizedRagService } = await import('@/lib/optimizedRagService');
+      
+      toast({
+        title: 'Rebuilding Knowledge Base',
+        description: 'Clearing old data and rebuilding with correct embeddings...',
+      });
+      
+      await optimizedRagService.forceRepopulate();
+      
+      toast({
+        title: 'Knowledge Base Rebuilt',
+        description: 'Knowledge bases have been rebuilt with correct 384-dimensional embeddings.',
+      });
+    } catch (error) {
+      console.error('[HybridAnalyzer] Force repopulate error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to rebuild knowledge bases',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const getProviderIcon = () => {
     if (serviceStatus.currentProvider === 'client-side') {
       return <Cpu className="h-4 w-4 text-green-500" />;
@@ -262,7 +288,7 @@ export function HybridHazardAnalyzer() {
               </div>
             )}
             
-            {/* Quick Access Icons - Only Prompt Template */}
+            {/* Quick Access Icons */}
             <TooltipProvider>
               <div className="flex items-center justify-center gap-4 mt-6">
                 <Tooltip>
@@ -278,6 +304,22 @@ export function HybridHazardAnalyzer() {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>View Prompt Templates</p>
+                  </TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={forceRepopulate}
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <RefreshCw className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Fix Knowledge Base (Rebuild Embeddings)</p>
                   </TooltipContent>
                 </Tooltip>
               </div>

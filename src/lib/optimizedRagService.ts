@@ -123,8 +123,9 @@ class OptimizedRagService {
           chunksWithEmbeddings.push({
             knowledge_base_id: kbId,
             chunk_text: text,
-            embedding: JSON.stringify(embedding), // pgvector expects array as string
+            client_embedding: JSON.stringify(embedding), // Store in client_embedding column for 384-dim vectors
             chunk_index: i,
+            embedding_provider: 'client-side',
           });
           
           console.log(`[OptimizedRAG] Processed chunk ${i + 1}/${chunks.length} for ${config.name}`);
@@ -170,10 +171,10 @@ class OptimizedRagService {
       // Convert embedding array to pgvector format
       const embeddingString = `[${queryEmbedding.join(',')}]`;
       
-      // Use pgvector's cosine similarity search with proper typing
+      // Use pgvector's cosine similarity search with client_embedding for 384-dim vectors
       const { data, error } = await supabase.rpc('similarity_search' as any, {
         query_embedding: embeddingString,
-        kb_id: knowledgeBaseId, // Updated parameter name to match function
+        kb_id: knowledgeBaseId,
         match_count: topK
       });
       
@@ -328,6 +329,13 @@ class OptimizedRagService {
       console.error('[OptimizedRAG] Error clearing knowledge bases:', error);
       throw error;
     }
+  }
+
+  // Force repopulate knowledge bases (clear and rebuild)
+  async forceRepopulate(): Promise<void> {
+    console.log('[OptimizedRAG] Force repopulating knowledge bases...');
+    await this.clearAllKnowledgeBases();
+    await this.populateKnowledgeBases();
   }
 }
 
