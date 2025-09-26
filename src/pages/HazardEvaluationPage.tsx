@@ -9,30 +9,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { hazardReportService } from '@/lib/hazardReportService';
-import { aiRecommendationService } from '@/lib/aiRecommendationService';
+import { hiraRecommendationService } from '@/lib/hiraRecommendationService';
 import { SimilarReportsAnalysis } from '@/components/SimilarReportsAnalysis';
 import { 
   ArrowLeft,
   Calendar as CalendarIcon,
   Sparkles,
   Save,
-  Plus,
   Eye,
-  CheckCircle,
-  Clock,
   AlertTriangle,
   MapPin,
-  Building,
   User,
   FileText,
   Zap,
   Target,
-  Shield,
-  Lightbulb
+  Shield
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -91,13 +85,6 @@ export default function HazardEvaluationPage() {
   const [generatingRecommendations, setGeneratingRecommendations] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [dueDate, setDueDate] = useState<Date>();
-  const [newActionItem, setNewActionItem] = useState<ActionItem>({
-    jenis_tindakan: '',
-    alur_permasalahan: '',
-    tindakan: '',
-    due_date: '',
-    priority_level: 'MEDIUM'
-  });
 
   const [evaluationData, setEvaluationData] = useState({
     kategori_temuan: '',
@@ -155,82 +142,32 @@ export default function HazardEvaluationPage() {
     }
   };
 
-  const generateRootCauseRecommendations = async () => {
+  const generateHiraRecommendations = async () => {
     if (!report) return;
     
     try {
       setGeneratingRecommendations(true);
-      const recommendations = await aiRecommendationService.generateRootCauseAnalysis({
-        deskripsi_temuan: report.finding_description,
-        lokasi: report.location,
-        ketidaksesuaian: report.non_compliance,
-        sub_ketidaksesuaian: report.sub_non_compliance,
-        quick_action: report.quick_action,
-        image_base64: report.image_base64
-      });
+      const recommendations = await hiraRecommendationService.getRecommendations(
+        report.finding_description,
+        report.location,
+        report.non_compliance
+      );
 
       setEvaluationData(prev => ({
         ...prev,
-        root_cause_analysis: recommendations
+        alur_permasalahan: recommendations.rootCause,
+        tindakan: recommendations.correctiveAction
       }));
 
       toast({
-        title: 'AI Recommendation Generated',
-        description: 'Root cause analysis has been generated successfully',
+        title: recommendations.source === 'hira' ? 'HIRA Recommendation' : 'AI Recommendation',
+        description: recommendations.message || 'Rekomendasi telah dihasilkan',
       });
     } catch (error) {
-      console.error('Error generating recommendations:', error);
+      console.error('Error generating HIRA recommendations:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate AI recommendations',
-        variant: 'destructive',
-      });
-    } finally {
-      setGeneratingRecommendations(false);
-    }
-  };
-
-  const generateActionPlan = async () => {
-    if (!report) return;
-    
-    try {
-      setGeneratingRecommendations(true);
-      const actionPlan = await aiRecommendationService.generateCorrectiveActions({
-        deskripsi_temuan: report.finding_description,
-        lokasi: report.location,
-        ketidaksesuaian: report.non_compliance,
-        sub_ketidaksesuaian: report.sub_non_compliance,
-        quick_action: report.quick_action,
-        image_base64: report.image_base64
-      });
-
-      setEvaluationData(prev => ({
-        ...prev,
-        corrective_actions: actionPlan.corrective_actions,
-        preventive_measures: actionPlan.preventive_measures,
-        jenis_tindakan: actionPlan.jenis_tindakan,
-        tindakan: actionPlan.tindakan,
-        alur_permasalahan: `Berdasarkan analisis AI: ${report.non_compliance} dapat menyebabkan risiko keselamatan kerja`
-      }));
-
-      // Suggest due date based on risk level
-      const suggestedDate = new Date();
-      suggestedDate.setDate(suggestedDate.getDate() + actionPlan.due_date_suggestion);
-      setDueDate(suggestedDate);
-      setEvaluationData(prev => ({
-        ...prev,
-        due_date_perbaikan: suggestedDate.toISOString().split('T')[0]
-      }));
-
-      toast({
-        title: 'Action Plan Generated',
-        description: 'Corrective actions and timeline have been generated',
-      });
-    } catch (error) {
-      console.error('Error generating action plan:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate action plan',
+        description: 'Failed to generate recommendations',
         variant: 'destructive',
       });
     } finally {
@@ -245,17 +182,16 @@ export default function HazardEvaluationPage() {
       setSaving(true);
       await hazardReportService.updateHazardEvaluation(report.id, {
         ...evaluationData,
-        status: 'UNDER_EVALUATION',
+        status: 'COMPLETED',
         evaluated_by: 'current-evaluator' // In a real app, this would be the current user ID
       });
 
       toast({
-        title: 'Evaluation Saved',
-        description: 'Hazard evaluation has been saved successfully',
+        title: 'Evaluation Completed',
+        description: 'Hazard evaluation has been completed successfully',
       });
       
-      // Reload report to get updated data
-      await loadHazardReport();
+      navigate('/evaluator');
     } catch (error) {
       console.error('Error saving evaluation:', error);
       toast({
@@ -269,70 +205,11 @@ export default function HazardEvaluationPage() {
   };
 
   const addActionItem = async () => {
-    if (!report || !newActionItem.jenis_tindakan || !newActionItem.tindakan || !newActionItem.due_date) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in all required fields',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await hazardReportService.addActionItem(report.id, newActionItem);
-      
-      // Reset form
-      setNewActionItem({
-        jenis_tindakan: '',
-        alur_permasalahan: '',
-        tindakan: '',
-        due_date: '',
-        priority_level: 'MEDIUM'
-      });
-
-      toast({
-        title: 'Action Item Added',
-        description: 'New action item has been added successfully',
-      });
-      
-      // Reload report
-      await loadHazardReport();
-    } catch (error) {
-      console.error('Error adding action item:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add action item',
-        variant: 'destructive',
-      });
-    }
+    // Remove this function as we're removing the action items section
   };
-
+  
   const confirmEvaluation = async () => {
-    if (!report) return;
-    
-    try {
-      setSaving(true);
-      await hazardReportService.updateHazardEvaluation(report.id, {
-        ...evaluationData,
-        status: 'IN_PROGRESS'
-      });
-
-      toast({
-        title: 'Evaluation Confirmed',
-        description: 'Hazard evaluation has been confirmed and moved to In Progress',
-      });
-      
-      navigate('/evaluator');
-    } catch (error) {
-      console.error('Error confirming evaluation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to confirm evaluation',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
+    // Remove this function as we're removing the confirmation section
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -543,109 +420,6 @@ export default function HazardEvaluationPage() {
           onSimilarReportsFound={(count) => console.log(`Found ${count} similar reports`)}
         />
 
-        {/* AI-Powered Evaluation Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-500" />
-              Evaluasi & Rekomendasi AI
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Kategori Temuan */}
-            <div>
-              <Label htmlFor="kategori_temuan">Kategori Temuan</Label>
-              <Select value={evaluationData.kategori_temuan} onValueChange={(value) => setEvaluationData(prev => ({ ...prev, kategori_temuan: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih kategori temuan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Kondisi Tidak Aman">Kondisi Tidak Aman</SelectItem>
-                  <SelectItem value="Tindakan Tidak Aman">Tindakan Tidak Aman</SelectItem>
-                  <SelectItem value="Near Miss">Near Miss</SelectItem>
-                  <SelectItem value="Environmental Issue">Environmental Issue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Root Cause Analysis Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Akar Permasalahan
-                </Label>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={generateRootCauseRecommendations}
-                  disabled={generatingRecommendations}
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {generatingRecommendations ? 'Generating...' : 'Generate Recommendation'}
-                </Button>
-              </div>
-              <Textarea
-                value={evaluationData.root_cause_analysis}
-                onChange={(e) => setEvaluationData(prev => ({ ...prev, root_cause_analysis: e.target.value }))}
-                placeholder="Analisis akar masalah akan dihasilkan oleh AI atau dapat diisi manual..."
-                rows={4}
-              />
-            </div>
-
-            {/* Corrective Actions Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Tindakan Perbaikan
-                </Label>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={generateActionPlan}
-                  disabled={generatingRecommendations}
-                >
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  {generatingRecommendations ? 'Generating...' : 'Generate Action Plan'}
-                </Button>
-              </div>
-              <Textarea
-                value={evaluationData.corrective_actions}
-                onChange={(e) => setEvaluationData(prev => ({ ...prev, corrective_actions: e.target.value }))}
-                placeholder="Tindakan perbaikan akan dihasilkan oleh AI..."
-                rows={3}
-              />
-            </div>
-
-            {/* Preventive Measures */}
-            <div>
-              <Label>Langkah Pencegahan</Label>
-              <Textarea
-                value={evaluationData.preventive_measures}
-                onChange={(e) => setEvaluationData(prev => ({ ...prev, preventive_measures: e.target.value }))}
-                placeholder="Langkah pencegahan untuk mencegah kejadian serupa..."
-                rows={3}
-              />
-            </div>
-
-            {/* Risk Level */}
-            <div>
-              <Label>Tingkat Risiko</Label>
-              <Select value={evaluationData.risk_level} onValueChange={(value) => setEvaluationData(prev => ({ ...prev, risk_level: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih tingkat risiko" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="HIGH">High - Risiko Tinggi</SelectItem>
-                  <SelectItem value="MEDIUM">Medium - Risiko Sedang</SelectItem>
-                  <SelectItem value="LOW">Low - Risiko Rendah</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Follow-up Management */}
         <Card>
           <CardHeader>
@@ -686,22 +460,39 @@ export default function HazardEvaluationPage() {
               </div>
             </div>
 
-            <div>
-              <Label>Alur Permasalahan</Label>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Akar Permasalahan
+                </Label>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={generateHiraRecommendations}
+                  disabled={generatingRecommendations}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {generatingRecommendations ? 'Generating...' : 'Generate Recommendation'}
+                </Button>
+              </div>
               <Textarea
                 value={evaluationData.alur_permasalahan}
                 onChange={(e) => setEvaluationData(prev => ({ ...prev, alur_permasalahan: e.target.value }))}
-                placeholder="Jelaskan alur bagaimana masalah ini dapat berkembang..."
+                placeholder="Akar permasalahan akan dihasilkan dari knowledge base HIRA atau AI..."
                 rows={3}
               />
             </div>
 
-            <div>
-              <Label>Tindakan</Label>
+            <div className="space-y-4">
+              <Label className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Tindakan Perbaikan
+              </Label>
               <Textarea
                 value={evaluationData.tindakan}
                 onChange={(e) => setEvaluationData(prev => ({ ...prev, tindakan: e.target.value }))}
-                placeholder="Tindakan spesifik yang akan dilakukan..."
+                placeholder="Tindakan perbaikan akan dihasilkan dari knowledge base HIRA atau AI..."
                 rows={3}
               />
             </div>
@@ -740,155 +531,10 @@ export default function HazardEvaluationPage() {
               </Popover>
             </div>
 
-            <Button onClick={saveEvaluation} disabled={saving}>
+            <Button onClick={saveEvaluation} disabled={saving} size="lg" className="w-full">
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Menyimpan...' : 'Simpan Evaluasi'}
+              {saving ? 'Menyelesaikan...' : 'Selesaikan Evaluasi'}
             </Button>
-          </CardContent>
-        </Card>
-
-        {/* Action Tracking Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5" />
-              Alasan Penindakan
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Existing Action Items */}
-            {report.hazard_action_items && report.hazard_action_items.length > 0 && (
-              <div className="mb-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Jenis Tindakan</TableHead>
-                      <TableHead>Alur Permasalahan</TableHead>
-                      <TableHead>Tindakan</TableHead>
-                      <TableHead>Due Date Perbaikan</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {report.hazard_action_items.map((action: any) => (
-                      <TableRow key={action.id}>
-                        <TableCell>
-                          <Badge variant="outline">{action.jenis_tindakan}</Badge>
-                        </TableCell>
-                        <TableCell>{action.alur_permasalahan}</TableCell>
-                        <TableCell>{action.tindakan}</TableCell>
-                        <TableCell>
-                          {format(new Date(action.due_date), 'dd MMM yyyy', { locale: idLocale })}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={action.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                            {action.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-
-            {/* Add New Action Item */}
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-              <h4 className="font-medium flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Tambah Tindakan Baru
-              </h4>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Jenis Tindakan</Label>
-                  <Select value={newActionItem.jenis_tindakan} onValueChange={(value) => setNewActionItem(prev => ({ ...prev, jenis_tindakan: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih jenis tindakan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PERBAIKAN">PERBAIKAN</SelectItem>
-                      <SelectItem value="PELATIHAN">PELATIHAN</SelectItem>
-                      <SelectItem value="INVESTIGASI">INVESTIGASI</SelectItem>
-                      <SelectItem value="MONITORING">MONITORING</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Priority Level</Label>
-                  <Select value={newActionItem.priority_level} onValueChange={(value) => setNewActionItem(prev => ({ ...prev, priority_level: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih prioritas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="HIGH">High</SelectItem>
-                      <SelectItem value="MEDIUM">Medium</SelectItem>
-                      <SelectItem value="LOW">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label>Alur Permasalahan</Label>
-                <Textarea
-                  value={newActionItem.alur_permasalahan}
-                  onChange={(e) => setNewActionItem(prev => ({ ...prev, alur_permasalahan: e.target.value }))}
-                  placeholder="Jelaskan alur permasalahan..."
-                  rows={2}
-                />
-              </div>
-
-              <div>
-                <Label>Tindakan</Label>
-                <Textarea
-                  value={newActionItem.tindakan}
-                  onChange={(e) => setNewActionItem(prev => ({ ...prev, tindakan: e.target.value }))}
-                  placeholder="Tindakan yang akan dilakukan..."
-                  rows={2}
-                />
-              </div>
-
-              <div>
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={newActionItem.due_date}
-                  onChange={(e) => setNewActionItem(prev => ({ ...prev, due_date: e.target.value }))}
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-
-              <Button onClick={addActionItem} className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Tindakan
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Final Confirmation */}
-        <Card className="border-green-200 bg-green-50 dark:bg-green-950/10">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
-              <div>
-                <h3 className="text-lg font-semibold text-green-800 dark:text-green-400">Konfirmasi Evaluasi</h3>
-                <p className="text-green-700 dark:text-green-300">
-                  Setelah semua evaluasi dan tindakan selesai diisi, konfirmasi untuk melanjutkan ke tahap implementasi.
-                </p>
-              </div>
-              <Button 
-                size="lg" 
-                className="bg-green-600 hover:bg-green-700 text-white px-8"
-                onClick={confirmEvaluation}
-                disabled={saving}
-              >
-                <CheckCircle className="h-5 w-5 mr-2" />
-                {saving ? 'Processing...' : 'Konfirmasi Evaluasi'}
-              </Button>
-            </div>
           </CardContent>
         </Card>
 
