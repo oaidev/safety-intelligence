@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      bulk_import_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_log: Json | null
+          failed_rows: number
+          id: string
+          kb_id: string
+          kb_name: string
+          operation_type: string
+          processed_rows: number
+          status: string
+          total_rows: number
+          updated_at: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_log?: Json | null
+          failed_rows?: number
+          id?: string
+          kb_id: string
+          kb_name: string
+          operation_type?: string
+          processed_rows?: number
+          status?: string
+          total_rows?: number
+          updated_at?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_log?: Json | null
+          failed_rows?: number
+          id?: string
+          kb_id?: string
+          kb_name?: string
+          operation_type?: string
+          processed_rows?: number
+          status?: string
+          total_rows?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       knowledge_base_chunks: {
         Row: {
           chunk_index: number

@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.analyze-hazard-quality]
 verify_jwt = false
+
+[functions.bulk-import-knowledge-base]
+verify_jwt = false

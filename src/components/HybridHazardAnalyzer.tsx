@@ -24,8 +24,10 @@ import {
   Globe,
   Download,
   CheckCircle,
-  Clock
+  Clock,
+  Settings
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function HybridHazardAnalyzer() {
   const [hazardDescription, setHazardDescription] = useState('');
@@ -263,6 +265,23 @@ export function HybridHazardAnalyzer() {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>View Prompt Templates</p>
+                  </TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link to="/settings">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-primary"
+                      >
+                        <Settings className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Manage Knowledge Bases & Settings</p>
                   </TooltipContent>
                 </Tooltip>
                 
