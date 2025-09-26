@@ -72,6 +72,7 @@ export default function EvaluatorDashboard() {
   });
   const [selectedReport, setSelectedReport] = useState<HazardReport | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [groupByClusters, setGroupByClusters] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -128,6 +129,49 @@ export default function EvaluatorDashboard() {
       default:
         return status;
     }
+  };
+
+  // Group reports by cluster
+  const groupedReports = () => {
+    if (!groupByClusters) return [{ cluster_id: null, reports }];
+    
+    const clustered = new Map();
+    const unclustered: HazardReport[] = [];
+    
+    reports.forEach(report => {
+      if (report.similarity_cluster_id) {
+        if (!clustered.has(report.similarity_cluster_id)) {
+          clustered.set(report.similarity_cluster_id, []);
+        }
+        clustered.get(report.similarity_cluster_id).push(report);
+      } else {
+        unclustered.push(report);
+      }
+    });
+    
+    const result = Array.from(clustered.entries()).map(([cluster_id, reports]) => ({
+      cluster_id,
+      reports
+    }));
+    
+    if (unclustered.length > 0) {
+      result.push({ cluster_id: null, reports: unclustered });
+    }
+    
+    return result;
+  };
+
+  const getClusterColor = (clusterId: string) => {
+    const colors = [
+      'bg-blue-100 text-blue-800 border-blue-200',
+      'bg-green-100 text-green-800 border-green-200',
+      'bg-purple-100 text-purple-800 border-purple-200',
+      'bg-orange-100 text-orange-800 border-orange-200',
+      'bg-pink-100 text-pink-800 border-pink-200',
+      'bg-indigo-100 text-indigo-800 border-indigo-200',
+    ];
+    const hash = clusterId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    return colors[hash % colors.length];
   };
 
   const handleViewDetails = async (report: HazardReport) => {
@@ -294,7 +338,17 @@ export default function EvaluatorDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Daftar Laporan Hazard</span>
-              <Badge variant="outline">{reports.length} laporan</Badge>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant={groupByClusters ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setGroupByClusters(!groupByClusters)}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  {groupByClusters ? 'Tampilan Normal' : 'Group by Cluster'}
+                </Button>
+                <Badge variant="outline">{reports.length} laporan</Badge>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -302,68 +356,185 @@ export default function EvaluatorDashboard() {
               <div className="text-center py-8">Loading...</div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID Tracking</TableHead>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Pelapor</TableHead>
-                      <TableHead>Lokasi</TableHead>
-                      <TableHead>Jenis Hazard</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Cluster</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reports.map((report) => (
-                      <TableRow key={report.id}>
-                        <TableCell className="font-mono text-sm">
-                          {report.tracking_id}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(report.created_at), 'dd MMM yyyy', { locale: idLocale })}
-                        </TableCell>
-                        <TableCell>{report.reporter_name}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                            {report.location}
+                {groupByClusters ? (
+                  // Grouped by Clusters View
+                  <div className="space-y-6">
+                    {groupedReports().map((group, groupIndex) => (
+                      <div key={group.cluster_id || 'unclustered'} className="space-y-3">
+                        {/* Cluster Header */}
+                        {group.cluster_id ? (
+                          <div className={`rounded-lg border-2 p-4 ${getClusterColor(group.cluster_id)}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Users className="h-5 w-5" />
+                                <div>
+                                  <h3 className="font-semibold">Cluster #{groupIndex + 1}</h3>
+                                  <p className="text-sm opacity-80">
+                                    {group.reports.length} laporan serupa • Tingkat kesamaan tinggi
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge variant="secondary" className="bg-white/50">
+                                {group.reports.length} laporan
+                              </Badge>
+                            </div>
+                            
+                            {/* Common characteristics */}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Badge variant="outline" className="bg-white/30">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                {group.reports[0].location}
+                              </Badge>
+                              <Badge variant="outline" className="bg-white/30">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                {group.reports[0].non_compliance}
+                              </Badge>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <div className="font-medium">{report.non_compliance}</div>
-                            <div className="text-muted-foreground text-xs">{report.sub_non_compliance}</div>
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-muted p-4">
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-5 w-5 text-muted-foreground" />
+                              <div>
+                                <h3 className="font-semibold text-muted-foreground">Laporan Individual</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {group.reports.length} laporan tanpa cluster
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusBadgeVariant(report.status)}>
-                            {getStatusLabel(report.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {report.similarity_cluster_id && (
-                            <Badge variant="outline" className="text-xs">
-                              <Users className="h-3 w-3 mr-1" />
-                              Cluster
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewDetails(report)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Detail
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                        )}
+
+                        {/* Reports in this cluster */}
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>ID Tracking</TableHead>
+                              <TableHead>Tanggal</TableHead>
+                              <TableHead>Pelapor</TableHead>
+                              <TableHead>Lokasi</TableHead>
+                              <TableHead>Jenis Hazard</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.reports.map((report, reportIndex) => (
+                              <TableRow 
+                                key={report.id}
+                                className={group.cluster_id ? `border-l-4 ${getClusterColor(group.cluster_id).split(' ')[0].replace('bg-', 'border-')}` : ''}
+                              >
+                                <TableCell className="font-mono text-sm">
+                                  <div className="flex items-center gap-2">
+                                    {group.cluster_id && reportIndex === 0 && (
+                                      <div className="w-2 h-2 rounded-full bg-current opacity-60"></div>
+                                    )}
+                                    {report.tracking_id}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {format(new Date(report.created_at), 'dd MMM yyyy', { locale: idLocale })}
+                                </TableCell>
+                                <TableCell>{report.reporter_name}</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-muted-foreground" />
+                                    {report.location}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="text-sm">
+                                    <div className="font-medium">{report.non_compliance}</div>
+                                    <div className="text-muted-foreground text-xs">{report.sub_non_compliance}</div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={getStatusBadgeVariant(report.status)}>
+                                    {getStatusLabel(report.status)}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleViewDetails(report)}
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    Detail
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+                ) : (
+                  // Normal Table View
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID Tracking</TableHead>
+                        <TableHead>Tanggal</TableHead>
+                        <TableHead>Pelapor</TableHead>
+                        <TableHead>Lokasi</TableHead>
+                        <TableHead>Jenis Hazard</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Cluster</TableHead>
+                        <TableHead>Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reports.map((report) => (
+                        <TableRow key={report.id}>
+                          <TableCell className="font-mono text-sm">
+                            {report.tracking_id}
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(report.created_at), 'dd MMM yyyy', { locale: idLocale })}
+                          </TableCell>
+                          <TableCell>{report.reporter_name}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {report.location}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div className="font-medium">{report.non_compliance}</div>
+                              <div className="text-muted-foreground text-xs">{report.sub_non_compliance}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusBadgeVariant(report.status)}>
+                              {getStatusLabel(report.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {report.similarity_cluster_id && (
+                              <Badge variant="outline" className="text-xs">
+                                <Users className="h-3 w-3 mr-1" />
+                                Cluster
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewDetails(report)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Detail
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
             )}
           </CardContent>
