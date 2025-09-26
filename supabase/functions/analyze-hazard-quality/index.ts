@@ -158,7 +158,7 @@ WAJIB: Berikan response dalam format JSON yang valid berikut:
     console.log('Making request to Gemini API for hazard quality analysis');
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
