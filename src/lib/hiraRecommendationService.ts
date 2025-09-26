@@ -9,49 +9,74 @@ interface HiraRecommendation {
 
 class HiraRecommendationService {
   
-  // Search HIRA knowledge base for relevant recommendations
+  // Search HIRA knowledge base for relevant recommendations using vector similarity
   async searchHiraRecommendations(hazardDescription: string): Promise<{ contexts: string[], hasResults: boolean }> {
     try {
       console.log('[HIRA] Searching HIRA knowledge base for:', hazardDescription.substring(0, 100));
       
-      // Get HIRA chunks from database
-      const { data: hiraChunks, error } = await supabase
-        .from('knowledge_base_chunks')
-        .select('chunk_text')
-        .eq('knowledge_base_id', 'hira')
-        .limit(10);
+      // Use the optimized RAG service for vector similarity search
+      const { optimizedRagService } = await import('./optimizedRagService');
       
-      if (error) {
-        console.error('[HIRA] Error fetching HIRA chunks:', error);
+      // Initialize the service if needed
+      await optimizedRagService.initialize();
+      
+      // Generate embedding for the hazard description
+      const queryEmbedding = await optimizedRagService.generateEmbedding(hazardDescription);
+      
+      // Search HIRA knowledge base using vector similarity
+      const hiraResults = await optimizedRagService.retrieveContext(queryEmbedding, 'hira', 5);
+      
+      if (!hiraResults || hiraResults.length === 0) {
+        console.log('[HIRA] No HIRA knowledge base results found');
         return { contexts: [], hasResults: false };
       }
       
-      if (!hiraChunks || hiraChunks.length === 0) {
-        console.log('[HIRA] No HIRA knowledge base found');
-        return { contexts: [], hasResults: false };
-      }
+      console.log(`[HIRA] Found ${hiraResults.length} relevant chunks with similarity search`);
       
-      // Simple text matching for HIRA content
-      const relevantChunks = hiraChunks.filter(chunk => {
-        const chunkText = chunk.chunk_text.toLowerCase();
-        const queryWords = hazardDescription.toLowerCase().split(' ');
-        
-        // Check if chunk contains relevant keywords
-        return queryWords.some(word => 
-          word.length > 3 && chunkText.includes(word)
-        );
-      });
-      
-      console.log(`[HIRA] Found ${relevantChunks.length} relevant chunks`);
+      // Filter results with decent similarity scores (> 0.3)
+      const relevantChunks = hiraResults.filter(result => result.similarity > 0.3);
       
       return {
-        contexts: relevantChunks.map(chunk => chunk.chunk_text),
+        contexts: relevantChunks.map(chunk => chunk.text),
         hasResults: relevantChunks.length > 0
       };
       
     } catch (error) {
       console.error('[HIRA] Error searching HIRA knowledge base:', error);
-      return { contexts: [], hasResults: false };
+      
+      // Fallback to simple text search if vector search fails
+      try {
+        const { data: hiraChunks, error: fallbackError } = await supabase
+          .from('knowledge_base_chunks')
+          .select('chunk_text')
+          .eq('knowledge_base_id', 'hira')
+          .limit(10);
+        
+        if (fallbackError || !hiraChunks) {
+          return { contexts: [], hasResults: false };
+        }
+        
+        // Simple text matching as fallback
+        const relevantChunks = hiraChunks.filter(chunk => {
+          const chunkText = chunk.chunk_text.toLowerCase();
+          const queryWords = hazardDescription.toLowerCase().split(' ');
+          
+          return queryWords.some(word => 
+            word.length > 3 && chunkText.includes(word)
+          );
+        });
+        
+        console.log(`[HIRA] Fallback text search found ${relevantChunks.length} chunks`);
+        
+        return {
+          contexts: relevantChunks.map(chunk => chunk.chunk_text),
+          hasResults: relevantChunks.length > 0
+        };
+        
+      } catch (fallbackError) {
+        console.error('[HIRA] Fallback search also failed:', fallbackError);
+        return { contexts: [], hasResults: false };
+      }
     }
   }
   
