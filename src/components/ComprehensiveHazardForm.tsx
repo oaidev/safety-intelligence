@@ -167,6 +167,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
     // Check for similar hazards before submission
     const similarHazards = await similarityDetectionService.checkSimilarHazards({
       location: data.location,
+      detail_location: data.detailLocation,
       non_compliance: data.nonCompliance,
       sub_non_compliance: data.subNonCompliance,
       finding_description: data.findingDescription,
