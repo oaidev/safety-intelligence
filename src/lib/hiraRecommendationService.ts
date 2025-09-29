@@ -7,7 +7,7 @@ interface HiraRecommendation {
   message?: string;
 }
 
-interface ComprehensiveHiraRecommendation {
+export interface ComprehensiveHiraRecommendation {
   source: 'hira' | 'ai';
   confidence: number;
   

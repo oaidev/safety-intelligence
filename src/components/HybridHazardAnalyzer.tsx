@@ -10,9 +10,11 @@ import { KnowledgeBaseViewer } from '@/components/KnowledgeBaseViewer';
 import { PromptViewer } from '@/components/PromptViewer';
 import { AnalysisLoadingAnimation } from '@/components/AnalysisLoadingAnimation';
 import { HazardScoring } from '@/components/HazardScoring';
+import { ComprehensiveRecommendationDisplay } from '@/components/ComprehensiveRecommendationDisplay';
 
 import { hybridRagService, type MultiAnalysisResult, type ServiceStatus } from '@/lib/hybridRagService';
 import { scoringService, type AnalysisResult as ScoringAnalysisResult } from '@/lib/scoringService';
+import { hiraRecommendationService, type ComprehensiveHiraRecommendation } from '@/lib/hiraRecommendationService';
 import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles,
@@ -36,6 +38,8 @@ export function HybridHazardAnalyzer() {
   const [results, setResults] = useState<MultiAnalysisResult | null>(null);
   const [scoringAnalysis, setScoringAnalysis] = useState<ScoringAnalysisResult | null>(null);
   const [isScoring, setIsScoring] = useState(false);
+  const [hiraRecommendations, setHiraRecommendations] = useState<ComprehensiveHiraRecommendation | null>(null);
+  const [isGeneratingHira, setIsGeneratingHira] = useState(false);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>({
     isGoogleReady: true,
     isClientSideReady: false,
@@ -85,6 +89,7 @@ export function HybridHazardAnalyzer() {
     setIsAnalyzing(true);
     setResults(null);
     setScoringAnalysis(null);
+    setHiraRecommendations(null);
 
     try {
       // Import hazard report service
@@ -118,10 +123,11 @@ export function HybridHazardAnalyzer() {
         duration: 5000,
       });
 
-      // Start both analyses in parallel
-      const [analysisResults, scoringResults] = await Promise.allSettled([
+      // Start all analyses in parallel
+      const [analysisResults, scoringResults, hiraResults] = await Promise.allSettled([
         hybridRagService.analyzeHazardAll(data.description),
-        startScoringAnalysis(data.formData)
+        startScoringAnalysis(data.formData),
+        startHiraAnalysis(data.description, data.formData.location || 'Unknown', data.formData.nonCompliance || 'Unknown')
       ]);
 
       // Handle RAG analysis results
@@ -157,6 +163,22 @@ export function HybridHazardAnalyzer() {
           variant: 'destructive',
         });
       }
+
+      // Handle HIRA analysis results
+      if (hiraResults.status === 'fulfilled') {
+        setHiraRecommendations(hiraResults.value);
+        toast({
+          title: 'HIRA Recommendations Generated',
+          description: `Source: ${hiraResults.value.source === 'hira' ? 'HIRA Knowledge Base' : 'AI Generated'}`,
+        });
+      } else {
+        console.error('[HybridAnalyzer] HIRA error:', hiraResults.reason);
+        toast({
+          title: 'HIRA Analysis Failed',
+          description: 'HIRA recommendation analysis encountered an error',
+          variant: 'destructive',
+        });
+      }
       
     } catch (error) {
       console.error('[HybridAnalyzer] Analysis error:', error);
@@ -169,6 +191,7 @@ export function HybridHazardAnalyzer() {
     } finally {
       setIsAnalyzing(false);
       setIsScoring(false);
+      setIsGeneratingHira(false);
     }
   };
 
@@ -190,11 +213,23 @@ export function HybridHazardAnalyzer() {
     return await scoringService.analyzeHazardQuality(scoringFormData);
   };
 
+  const startHiraAnalysis = async (hazardDescription: string, location: string, nonCompliance: string): Promise<ComprehensiveHiraRecommendation> => {
+    setIsGeneratingHira(true);
+    console.log('[HybridAnalyzer] Starting HIRA analysis...');
+    
+    return await hiraRecommendationService.getComprehensiveRecommendations(
+      hazardDescription,
+      location,
+      nonCompliance
+    );
+  };
+
   const resetForm = () => {
     setHazardDescription('');
     setFormData(null);
     setResults(null);
     setScoringAnalysis(null);
+    setHiraRecommendations(null);
     localStorage.removeItem('hazard-form-data');
   };
 
@@ -343,7 +378,7 @@ export function HybridHazardAnalyzer() {
 
           {/* Results */}
           <div className="max-w-6xl mx-auto space-y-8">
-            {isAnalyzing || isScoring ? (
+            {isAnalyzing || isScoring || isGeneratingHira ? (
               <AnalysisLoadingAnimation />
             ) : (
               <>
@@ -355,6 +390,16 @@ export function HybridHazardAnalyzer() {
                       analysis={scoringAnalysis}
                       onImproveReport={handleImproveReport}
                       onExportReport={handleExportReport}
+                    />
+                  </div>
+                )}
+                
+                {/* HIRA Recommendations Results */}
+                {hiraRecommendations && (
+                  <div className="space-y-4">
+                    <h2 className="text-2xl font-bold text-center">Rekomendasi HIRA</h2>
+                    <ComprehensiveRecommendationDisplay 
+                      recommendations={hiraRecommendations}
                     />
                   </div>
                 )}
