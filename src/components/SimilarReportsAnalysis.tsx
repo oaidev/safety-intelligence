@@ -154,7 +154,7 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
                       </div>
                       
                       <Button asChild variant="outline" size="sm">
-                        <Link to={`/evaluator/hazard/${report.id}`}>
+                        <Link to={`/evaluate/${report.id}`}>
                           <Eye className="h-4 w-4 mr-1" />
                           Lihat
                         </Link>
@@ -216,7 +216,8 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
         </Card>
       )}
 
-      {/* System Pain Points */}
+      {/* System Pain Points - Hidden per user request */}
+      {/* 
       {painPoints.length > 0 && (
         <Card>
           <CardHeader>
@@ -268,6 +269,7 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
           </CardContent>
         </Card>
       )}
+      */}
     </div>
   );
 }
