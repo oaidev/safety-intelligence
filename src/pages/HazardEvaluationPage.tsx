@@ -460,98 +460,104 @@ export default function HazardEvaluationPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="RUBAH TINDAKAN">RUBAH TINDAKAN</SelectItem>
-                    <SelectItem value="TERIMA TINDAKAN">TERIMA TINDAKAN</SelectItem>
-                    <SelectItem value="PERLU REVIEW">PERLU REVIEW</SelectItem>
+                    <SelectItem value="TUTUP LAPORAN">TUTUP LAPORAN</SelectItem>
+                    <SelectItem value="DUPLIKAT">DUPLIKAT</SelectItem>
+                    <SelectItem value="BUKAN HAZARD">BUKAN HAZARD</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label>Jenis Tindakan</Label>
-                <Select value={evaluationData.jenis_tindakan} onValueChange={(value) => setEvaluationData(prev => ({ ...prev, jenis_tindakan: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih jenis tindakan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PERBAIKAN">PERBAIKAN</SelectItem>
-                    <SelectItem value="PELATIHAN">PELATIHAN</SelectItem>
-                    <SelectItem value="INVESTIGASI">INVESTIGASI</SelectItem>
-                    <SelectItem value="MONITORING">MONITORING</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
+                <div>
+                  <Label>Jenis Tindakan</Label>
+                  <Select value="PERBAIKAN" onValueChange={(value) => setEvaluationData(prev => ({ ...prev, jenis_tindakan: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih jenis tindakan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PERBAIKAN">PERBAIKAN</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Akar Permasalahan
-                </Label>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={generateHiraRecommendations}
-                  disabled={generatingRecommendations}
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {generatingRecommendations ? 'Generating...' : 'Generate Recommendation'}
-                </Button>
-              </div>
-              <Textarea
-                value={evaluationData.alur_permasalahan}
-                onChange={(e) => setEvaluationData(prev => ({ ...prev, alur_permasalahan: e.target.value }))}
-                placeholder="Akar permasalahan akan dihasilkan dari knowledge base HIRA atau AI..."
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-4">
-              <Label className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Tindakan Perbaikan
-              </Label>
-              <Textarea
-                value={evaluationData.tindakan}
-                onChange={(e) => setEvaluationData(prev => ({ ...prev, tindakan: e.target.value }))}
-                placeholder="Tindakan perbaikan akan dihasilkan dari knowledge base HIRA atau AI..."
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label>Due Date Perbaikan</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground"
-                    )}
+            {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    Akar Permasalahan
+                  </Label>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={generateHiraRecommendations}
+                    disabled={generatingRecommendations}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, "PPP", { locale: idLocale }) : <span>Pilih tanggal</span>}
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {generatingRecommendations ? 'Generating...' : 'Generate Recommendation'}
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={(date) => {
-                      setDueDate(date);
-                      setEvaluationData(prev => ({ 
-                        ...prev, 
-                        due_date_perbaikan: date ? date.toISOString().split('T')[0] : '' 
-                      }));
-                    }}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+                </div>
+                <Textarea
+                  value={evaluationData.alur_permasalahan}
+                  onChange={(e) => setEvaluationData(prev => ({ ...prev, alur_permasalahan: e.target.value }))}
+                  placeholder="Akar permasalahan akan dihasilkan dari knowledge base HIRA atau AI..."
+                  rows={3}
+                />
+              </div>
+            )}
+
+            {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Tindakan Perbaikan
+                </Label>
+                <Textarea
+                  value={evaluationData.tindakan}
+                  onChange={(e) => setEvaluationData(prev => ({ ...prev, tindakan: e.target.value }))}
+                  placeholder="Tindakan perbaikan akan dihasilkan dari knowledge base HIRA atau AI..."
+                  rows={3}
+                />
+              </div>
+            )}
+
+            {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
+              <div>
+                <Label>Due Date Perbaikan</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dueDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dueDate ? format(dueDate, "PPP", { locale: idLocale }) : <span>Pilih tanggal</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dueDate}
+                      onSelect={(date) => {
+                        setDueDate(date);
+                        setEvaluationData(prev => ({ 
+                          ...prev, 
+                          due_date_perbaikan: date ? date.toISOString().split('T')[0] : '' 
+                        }));
+                      }}
+                      disabled={(date) => date < new Date()}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
 
             <Button onClick={saveEvaluation} disabled={saving} size="lg" className="w-full">
               <Save className="h-4 w-4 mr-2" />

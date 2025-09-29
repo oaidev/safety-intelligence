@@ -351,7 +351,6 @@ export class HazardReportService {
   async getDashboardStats(): Promise<{
     total_reports: number;
     pending_review: number;
-    under_evaluation: number;
     in_progress: number;
     completed: number;
     pain_points: number;
@@ -372,13 +371,81 @@ export class HazardReportService {
       return {
         total_reports: reportsData.length,
         pending_review: reportsData.filter(r => r.status === 'PENDING_REVIEW').length,
-        under_evaluation: reportsData.filter(r => r.status === 'UNDER_EVALUATION').length,
         in_progress: reportsData.filter(r => r.status === 'IN_PROGRESS').length,
         completed: reportsData.filter(r => r.status === 'COMPLETED').length,
         pain_points: painPoints.length,
       };
     } catch (error) {
       console.error('[HazardReportService] Error fetching stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get timing analytics for reports
+   */
+  async getTimingAnalytics(): Promise<{
+    avg_review_to_close_days: number;
+    avg_submission_interval_hours: number;
+  }> {
+    try {
+      const { data: reports, error } = await supabase
+        .from('hazard_reports')
+        .select('created_at, evaluated_at, status')
+        .in('status', ['COMPLETED', 'DUPLIKAT', 'BUKAN_HAZARD'])
+        .not('evaluated_at', 'is', null);
+
+      if (error) {
+        console.error('[HazardReportService] Error fetching timing data:', error);
+        throw error;
+      }
+
+      // Calculate average time from creation to evaluation (review to close)
+      let totalReviewDays = 0;
+      let reviewCount = 0;
+      
+      if (reports && reports.length > 0) {
+        reports.forEach(report => {
+          if (report.evaluated_at) {
+            const createdAt = new Date(report.created_at);
+            const evaluatedAt = new Date(report.evaluated_at);
+            const diffDays = (evaluatedAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+            totalReviewDays += diffDays;
+            reviewCount++;
+          }
+        });
+      }
+
+      // Calculate average time between submissions
+      const { data: allReports, error: allReportsError } = await supabase
+        .from('hazard_reports')
+        .select('created_at')
+        .order('created_at', { ascending: true });
+
+      if (allReportsError) {
+        console.error('[HazardReportService] Error fetching submission data:', allReportsError);
+        throw allReportsError;
+      }
+
+      let totalIntervalHours = 0;
+      let intervalCount = 0;
+
+      if (allReports && allReports.length > 1) {
+        for (let i = 1; i < allReports.length; i++) {
+          const prevReport = new Date(allReports[i - 1].created_at);
+          const currentReport = new Date(allReports[i].created_at);
+          const diffHours = (currentReport.getTime() - prevReport.getTime()) / (1000 * 60 * 60);
+          totalIntervalHours += diffHours;
+          intervalCount++;
+        }
+      }
+
+      return {
+        avg_review_to_close_days: reviewCount > 0 ? totalReviewDays / reviewCount : 0,
+        avg_submission_interval_hours: intervalCount > 0 ? totalIntervalHours / intervalCount : 0,
+      };
+    } catch (error) {
+      console.error('[HazardReportService] Error calculating timing analytics:', error);
       throw error;
     }
   }

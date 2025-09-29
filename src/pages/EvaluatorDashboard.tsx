@@ -44,10 +44,14 @@ interface HazardReport {
 interface DashboardStats {
   total_reports: number;
   pending_review: number;
-  under_evaluation: number;
   in_progress: number;
   completed: number;
   pain_points: number;
+}
+
+interface TimingAnalytics {
+  avg_review_to_close_days: number;
+  avg_submission_interval_hours: number;
 }
 
 export default function EvaluatorDashboard() {
@@ -55,11 +59,15 @@ export default function EvaluatorDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     total_reports: 0,
     pending_review: 0,
-    under_evaluation: 0,
     in_progress: 0,
     completed: 0,
     pain_points: 0,
   });
+  const [timingAnalytics, setTimingAnalytics] = useState<TimingAnalytics>({
+    avg_review_to_close_days: 0,
+    avg_submission_interval_hours: 0,
+  });
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState('timing');
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     search: '',
@@ -80,13 +88,15 @@ export default function EvaluatorDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [reportsData, statsData] = await Promise.all([
+      const [reportsData, statsData, timingData] = await Promise.all([
         hazardReportService.getPendingReports(filters),
-        hazardReportService.getDashboardStats()
+        hazardReportService.getDashboardStats(),
+        hazardReportService.getTimingAnalytics()
       ]);
       
       setReports(reportsData);
       setStats(statsData);
+      setTimingAnalytics(timingData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       toast({
@@ -103,12 +113,14 @@ export default function EvaluatorDashboard() {
     switch (status) {
       case 'PENDING_REVIEW':
         return 'destructive';
-      case 'UNDER_EVALUATION':
-        return 'secondary';
       case 'IN_PROGRESS':
         return 'default';
       case 'COMPLETED':
         return 'default';
+      case 'DUPLIKAT':
+        return 'secondary';
+      case 'BUKAN_HAZARD':
+        return 'outline';
       default:
         return 'outline';
     }
@@ -118,12 +130,14 @@ export default function EvaluatorDashboard() {
     switch (status) {
       case 'PENDING_REVIEW':
         return 'Menunggu Review';
-      case 'UNDER_EVALUATION':
-        return 'Sedang Evaluasi';
       case 'IN_PROGRESS':
         return 'Dalam Proses';
       case 'COMPLETED':
         return 'Selesai';
+      case 'DUPLIKAT':
+        return 'Duplikat';
+      case 'BUKAN_HAZARD':
+        return 'Bukan Hazard';
       default:
         return status;
     }
@@ -218,7 +232,7 @@ export default function EvaluatorDashboard() {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             title="Total Laporan"
             value={stats.total_reports}
@@ -232,13 +246,6 @@ export default function EvaluatorDashboard() {
             icon={Clock}
             description="Perlu evaluasi"
             color="text-orange-500"
-          />
-          <StatCard
-            title="Sedang Evaluasi"
-            value={stats.under_evaluation}
-            icon={Eye}
-            description="Dalam proses"
-            color="text-yellow-500"
           />
           <StatCard
             title="Dalam Proses"
@@ -262,6 +269,83 @@ export default function EvaluatorDashboard() {
             color="text-red-500"
           />
         </div>
+
+        {/* Analysis Tabs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Analisis Dashboard</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-6">
+              <Button
+                variant={activeAnalysisTab === 'timing' ? 'default' : 'outline'}
+                onClick={() => setActiveAnalysisTab('timing')}
+                size="sm"
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Waktu Review
+              </Button>
+              <Button
+                variant={activeAnalysisTab === 'interval' ? 'default' : 'outline'}
+                onClick={() => setActiveAnalysisTab('interval')}
+                size="sm"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Interval Submission
+              </Button>
+              <Button
+                variant={activeAnalysisTab === 'clusters' ? 'default' : 'outline'}
+                onClick={() => setActiveAnalysisTab('clusters')}
+                size="sm"
+              >
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Pain Points
+              </Button>
+            </div>
+
+            {activeAnalysisTab === 'timing' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="text-center p-6 bg-muted/50 rounded-lg">
+                    <div className="text-3xl font-bold text-primary">
+                      {timingAnalytics.avg_review_to_close_days.toFixed(1)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Hari rata-rata dari review ke closing</div>
+                  </div>
+                  <div className="text-center p-6 bg-muted/50 rounded-lg">
+                    <div className="text-3xl font-bold text-primary">
+                      {timingAnalytics.avg_review_to_close_days <= 7 ? 'Baik' : timingAnalytics.avg_review_to_close_days <= 14 ? 'Sedang' : 'Perlu Perbaikan'}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Status performa review</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeAnalysisTab === 'interval' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="text-center p-6 bg-muted/50 rounded-lg">
+                    <div className="text-3xl font-bold text-primary">
+                      {timingAnalytics.avg_submission_interval_hours.toFixed(1)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Jam rata-rata antar submission</div>
+                  </div>
+                  <div className="text-center p-6 bg-muted/50 rounded-lg">
+                    <div className="text-3xl font-bold text-primary">
+                      {timingAnalytics.avg_submission_interval_hours <= 24 ? 'Tinggi' : timingAnalytics.avg_submission_interval_hours <= 72 ? 'Normal' : 'Rendah'}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Frekuensi pelaporan</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeAnalysisTab === 'clusters' && (
+              <ClusterAnalysisDashboard />
+            )}
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <Card>
@@ -292,9 +376,11 @@ export default function EvaluatorDashboard() {
                 <SelectContent>
                   <SelectItem value="ALL">Semua Status</SelectItem>
                   <SelectItem value="PENDING_REVIEW">Menunggu Review</SelectItem>
-                  <SelectItem value="UNDER_EVALUATION">Sedang Evaluasi</SelectItem>
                   <SelectItem value="IN_PROGRESS">Dalam Proses</SelectItem>
-                  <SelectItem value="COMPLETED">Selesai</SelectItem>
+                  <SelectItem value="DUPLIKAT">Duplikat</SelectItem>
+                  <SelectItem value="BUKAN_HAZARD">Bukan Hazard</SelectItem>
+                  <SelectItem value="DUPLIKAT">Duplikat</SelectItem>
+                  <SelectItem value="BUKAN_HAZARD">Bukan Hazard</SelectItem>
                 </SelectContent>
               </Select>
 
