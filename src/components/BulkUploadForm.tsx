@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import Papa from 'papaparse';
+import { optimizedRagService } from '@/lib/optimizedRagService';
 
 interface BulkImportJob {
   id: string;
@@ -22,15 +24,28 @@ interface BulkImportJob {
   created_at: string;
 }
 
+interface ProcessingStatus {
+  stage: 'parsing' | 'generating' | 'saving' | 'completed' | 'error';
+  totalRows: number;
+  processedRows: number;
+  failedRows: number;
+  currentBatch: number;
+  totalBatches: number;
+  errors: string[];
+}
+
 export function BulkUploadForm() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [kbId, setKbId] = useState('');
   const [kbName, setKbName] = useState('');
   const [operationType, setOperationType] = useState<'create' | 'replace' | 'append'>('create');
-  const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
   const [currentJob, setCurrentJob] = useState<BulkImportJob | null>(null);
+  const [isCancelled, setIsCancelled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const BATCH_SIZE = 100; // Process 100 rows per batch
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -54,6 +69,23 @@ export function BulkUploadForm() {
     }
   };
 
+  const parseCSVFile = (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.errors.length > 0) {
+            reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`));
+          } else {
+            resolve(results.data);
+          }
+        },
+        error: (error) => reject(error)
+      });
+    });
+  };
+
   const handleUpload = async () => {
     if (!selectedFile || !kbId || !kbName) {
       toast({
@@ -64,72 +96,176 @@ export function BulkUploadForm() {
       return;
     }
 
-    setIsUploading(true);
-
+    setIsProcessing(true);
+    setIsCancelled(false);
+    
     try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('kb_id', kbId);
-      formData.append('kb_name', kbName);
-      formData.append('operation_type', operationType);
-
-      // Call edge function
-      const { data, error } = await supabase.functions.invoke('bulk-import-knowledge-base', {
-        body: formData
+      // Stage 1: Parse file
+      setProcessingStatus({
+        stage: 'parsing',
+        totalRows: 0,
+        processedRows: 0,
+        failedRows: 0,
+        currentBatch: 0,
+        totalBatches: 0,
+        errors: []
       });
 
-      if (error) throw error;
+      const rows = await parseCSVFile(selectedFile);
+      
+      if (rows.length === 0) {
+        throw new Error('No data found in file');
+      }
 
-      setCurrentJob(data.job);
-      toast({
-        title: "Upload started",
-        description: `Processing ${selectedFile.name} in the background`
-      });
+      // Validate required columns
+      const firstRow = rows[0];
+      if (!firstRow.chunk_text || !firstRow.chunk_index) {
+        throw new Error('Missing required columns: chunk_text and chunk_index');
+      }
 
-      // Start polling for progress
-      pollJobProgress(data.job.id);
+      const totalBatches = Math.ceil(rows.length / BATCH_SIZE);
+      
+      setProcessingStatus(prev => prev ? {
+        ...prev,
+        stage: 'generating',
+        totalRows: rows.length,
+        totalBatches
+      } : null);
+
+      // Stage 2: Clear existing data if replacing
+      if (operationType === 'replace') {
+        const { error: deleteError } = await supabase
+          .from('knowledge_base_chunks')
+          .delete()
+          .eq('knowledge_base_id', kbId);
+        
+        if (deleteError) throw deleteError;
+      }
+
+      // Stage 3: Process in batches
+      await optimizedRagService.initialize();
+      
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        if (isCancelled) break;
+
+        const startIdx = batchIndex * BATCH_SIZE;
+        const endIdx = Math.min(startIdx + BATCH_SIZE, rows.length);
+        const batch = rows.slice(startIdx, endIdx);
+
+        setProcessingStatus(prev => prev ? {
+          ...prev,
+          currentBatch: batchIndex + 1,
+          stage: 'generating'
+        } : null);
+
+        // Generate embeddings for batch
+        const chunksWithEmbeddings = [];
+        const batchErrors: string[] = [];
+
+        for (let i = 0; i < batch.length; i++) {
+          if (isCancelled) break;
+
+          const row = batch[i];
+          try {
+            const embedding = await optimizedRagService.generateEmbedding(row.chunk_text);
+            
+            chunksWithEmbeddings.push({
+              knowledge_base_id: kbId,
+              chunk_text: row.chunk_text,
+              client_embedding: `[${embedding.join(',')}]`,
+              chunk_index: parseInt(row.chunk_index) || startIdx + i,
+              embedding_provider: 'client-side'
+            });
+
+            setProcessingStatus(prev => prev ? {
+              ...prev,
+              processedRows: startIdx + i + 1
+            } : null);
+
+          } catch (error) {
+            const errorMsg = `Row ${startIdx + i + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            batchErrors.push(errorMsg);
+            
+            setProcessingStatus(prev => prev ? {
+              ...prev,
+              failedRows: prev.failedRows + 1,
+              errors: [...prev.errors, errorMsg]
+            } : null);
+          }
+        }
+
+        if (isCancelled) break;
+
+        // Stage 4: Save batch to database
+        setProcessingStatus(prev => prev ? {
+          ...prev,
+          stage: 'saving'
+        } : null);
+
+        if (chunksWithEmbeddings.length > 0) {
+          const { error: insertError } = await supabase
+            .from('knowledge_base_chunks')
+            .insert(chunksWithEmbeddings);
+
+          if (insertError) {
+            throw new Error(`Database insert error: ${insertError.message}`);
+          }
+        }
+      }
+
+      if (!isCancelled) {
+        // Create knowledge base record if it doesn't exist
+        const { error: kbError } = await supabase
+          .from('knowledge_bases')
+          .upsert({
+            id: kbId,
+            name: kbName,
+            description: `Bulk imported from ${selectedFile.name}`,
+            color: '#3B82F6',
+            prompt_template: 'Analyze the hazard based on the following context: {context}'
+          });
+
+        if (kbError && !kbError.message.includes('duplicate key')) {
+          console.warn('Knowledge base creation error (non-critical):', kbError);
+        }
+
+        setProcessingStatus(prev => prev ? {
+          ...prev,
+          stage: 'completed'
+        } : null);
+
+        toast({
+          title: "Import completed",
+          description: `Successfully processed ${processingStatus?.processedRows || 0} rows${processingStatus?.failedRows ? ` (${processingStatus.failedRows} failed)` : ''}`
+        });
+      }
 
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('Bulk import error:', error);
+      setProcessingStatus(prev => prev ? {
+        ...prev,
+        stage: 'error',
+        errors: [...prev.errors, error instanceof Error ? error.message : 'Unknown error']
+      } : null);
+      
       toast({
-        title: "Upload failed",
-        description: "Failed to start the bulk import process",
+        title: "Import failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
         variant: "destructive"
       });
     } finally {
-      setIsUploading(false);
+      setIsProcessing(false);
     }
   };
 
-  const pollJobProgress = (jobId: string) => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('bulk_import_jobs')
-          .select('*')
-          .eq('id', jobId)
-          .single();
-
-        if (error) throw error;
-
-        setCurrentJob(data);
-
-        if (data.status === 'completed' || data.status === 'failed') {
-          clearInterval(pollInterval);
-          toast({
-            title: data.status === 'completed' ? "Import completed" : "Import failed",
-            description: data.status === 'completed' 
-              ? `Successfully processed ${data.processed_rows}/${data.total_rows} rows`
-              : `Failed to process ${data.failed_rows} rows`,
-            variant: data.status === 'completed' ? 'default' : 'destructive'
-          });
-        }
-      } catch (error) {
-        console.error('Error polling job progress:', error);
-        clearInterval(pollInterval);
-      }
-    }, 2000);
+  const handleCancel = () => {
+    setIsCancelled(true);
+    setIsProcessing(false);
+    setProcessingStatus(null);
+    toast({
+      title: "Import cancelled",
+      description: "The bulk import process has been cancelled"
+    });
   };
 
   const downloadSampleFile = () => {
@@ -186,7 +322,7 @@ export function BulkUploadForm() {
         <CardHeader>
           <CardTitle>Upload Knowledge Base Data</CardTitle>
           <CardDescription>
-            Upload up to 50,000 rows. Processing time: ~30-60 minutes for large files.
+            Upload up to 50,000 rows. Uses offline AI embeddings - no API costs or rate limits!
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -243,46 +379,108 @@ export function BulkUploadForm() {
               </div>
             </div>
 
-            <Button 
-              onClick={handleUpload} 
-              disabled={isUploading || !selectedFile || !kbId || !kbName}
-              className="w-full"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {isUploading ? 'Starting Upload...' : 'Start Bulk Import'}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleUpload} 
+                disabled={isProcessing || !selectedFile || !kbId || !kbName}
+                className="flex-1"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isProcessing ? 'Processing...' : 'Start Bulk Import'}
+              </Button>
+              
+              {isProcessing && (
+                <Button 
+                  onClick={handleCancel} 
+                  variant="outline"
+                  className="px-3"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Progress Card */}
-      {currentJob && (
+      {processingStatus && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              {currentJob.status === 'completed' && <CheckCircle className="h-5 w-5 text-success" />}
-              {currentJob.status === 'failed' && <AlertCircle className="h-5 w-5 text-destructive" />}
-              {currentJob.status === 'processing' && <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
-              Import Progress: {currentJob.kb_name}
+              {processingStatus.stage === 'completed' && <CheckCircle className="h-5 w-5 text-success" />}
+              {processingStatus.stage === 'error' && <AlertCircle className="h-5 w-5 text-destructive" />}
+              {processingStatus.stage !== 'completed' && processingStatus.stage !== 'error' && (
+                <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              )}
+              Offline Processing: {kbName}
             </CardTitle>
-            <CardDescription>
-              Status: <Badge variant={currentJob.status === 'completed' ? 'default' : currentJob.status === 'failed' ? 'destructive' : 'secondary'}>
-                {currentJob.status}
-              </Badge>
+            <CardDescription className="space-y-1">
+              <div>Stage: <Badge variant="outline" className="ml-2">
+                {processingStatus.stage === 'parsing' && 'Parsing File'}
+                {processingStatus.stage === 'generating' && 'Generating Embeddings'}
+                {processingStatus.stage === 'saving' && 'Saving to Database'}
+                {processingStatus.stage === 'completed' && 'Completed'}
+                {processingStatus.stage === 'error' && 'Error'}
+              </Badge></div>
+              {processingStatus.totalBatches > 0 && (
+                <div>Batch: {processingStatus.currentBatch}/{processingStatus.totalBatches}</div>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Progress: {currentJob.processed_rows}/{currentJob.total_rows} rows</span>
-                <span>{Math.round((currentJob.processed_rows / currentJob.total_rows) * 100)}%</span>
+                <span>Progress: {processingStatus.processedRows}/{processingStatus.totalRows} rows</span>
+                <span>
+                  {processingStatus.totalRows > 0 
+                    ? Math.round((processingStatus.processedRows / processingStatus.totalRows) * 100)
+                    : 0
+                  }%
+                </span>
               </div>
-              <Progress value={(currentJob.processed_rows / currentJob.total_rows) * 100} />
+              <Progress 
+                value={processingStatus.totalRows > 0 
+                  ? (processingStatus.processedRows / processingStatus.totalRows) * 100 
+                  : 0
+                } 
+              />
             </div>
             
-            {currentJob.failed_rows > 0 && (
-              <div className="text-sm text-destructive">
-                {currentJob.failed_rows} rows failed to process
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="text-center">
+                <div className="font-semibold text-success">{processingStatus.processedRows}</div>
+                <div className="text-muted-foreground">Processed</div>
+              </div>
+              <div className="text-center">
+                <div className="font-semibold text-destructive">{processingStatus.failedRows}</div>
+                <div className="text-muted-foreground">Failed</div>
+              </div>
+              <div className="text-center">
+                <div className="font-semibold text-muted-foreground">
+                  {processingStatus.totalRows - processingStatus.processedRows - processingStatus.failedRows}
+                </div>
+                <div className="text-muted-foreground">Remaining</div>
+              </div>
+            </div>
+
+            {processingStatus.errors.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-destructive">
+                  Errors ({processingStatus.errors.length}):
+                </div>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {processingStatus.errors.slice(-5).map((error, index) => (
+                    <div key={index} className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                      {error}
+                    </div>
+                  ))}
+                  {processingStatus.errors.length > 5 && (
+                    <div className="text-xs text-muted-foreground text-center">
+                      ... and {processingStatus.errors.length - 5} more errors
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </CardContent>
