@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from '@/hooks/use-toast';
 import { hazardReportService } from '@/lib/hazardReportService';
 import { hiraRecommendationService } from '@/lib/hiraRecommendationService';
+import { ComprehensiveRecommendationDisplay } from '@/components/ComprehensiveRecommendationDisplay';
 import { SimilarReportsAnalysis } from '@/components/SimilarReportsAnalysis';
 import { 
   ArrowLeft,
@@ -85,6 +86,8 @@ export default function HazardEvaluationPage() {
   const [generatingRecommendations, setGeneratingRecommendations] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [dueDate, setDueDate] = useState<Date>();
+  const [comprehensiveRecommendations, setComprehensiveRecommendations] = useState<any>(null);
+  const [showComprehensive, setShowComprehensive] = useState(false);
 
   const [evaluationData, setEvaluationData] = useState({
     kategori_temuan: '',
@@ -168,6 +171,51 @@ export default function HazardEvaluationPage() {
       toast({
         title: 'Error',
         description: 'Failed to generate recommendations',
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingRecommendations(false);
+    }
+  };
+
+  const generateComprehensiveRecommendations = async () => {
+    if (!report) return;
+    
+    try {
+      setGeneratingRecommendations(true);
+      const comprehensive = await hiraRecommendationService.getComprehensiveRecommendations(
+        report.finding_description,
+        report.location,
+        report.non_compliance
+      );
+
+      setComprehensiveRecommendations(comprehensive);
+      setShowComprehensive(true);
+
+      // Also update basic fields for compatibility
+      const basicRootCause = comprehensive.potentialRootCauses.humanFactors[0] || 
+                           comprehensive.potentialRootCauses.systemFactors[0] ||
+                           'Perlu investigasi mendalam';
+      
+      const basicAction = comprehensive.correctiveActions.engineeringControls[0] ||
+                         comprehensive.correctiveActions.administrativeControls[0] ||
+                         'Implementasi kontrol yang sesuai';
+
+      setEvaluationData(prev => ({
+        ...prev,
+        alur_permasalahan: basicRootCause,
+        tindakan: basicAction
+      }));
+
+      toast({
+        title: 'Comprehensive HIRA Analysis',
+        description: comprehensive.message || 'Rekomendasi komprehensif telah dihasilkan',
+      });
+    } catch (error) {
+      console.error('Error generating comprehensive recommendations:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate comprehensive recommendations',
         variant: 'destructive',
       });
     } finally {
@@ -501,15 +549,26 @@ export default function HazardEvaluationPage() {
                     <Target className="h-4 w-4" />
                     Akar Permasalahan
                   </Label>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={generateHiraRecommendations}
-                    disabled={generatingRecommendations}
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    {generatingRecommendations ? 'Generating...' : 'Generate Recommendation'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={generateHiraRecommendations}
+                      disabled={generatingRecommendations}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {generatingRecommendations ? 'Generating...' : 'Basic'}
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={generateComprehensiveRecommendations}
+                      disabled={generatingRecommendations}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {generatingRecommendations ? 'Generating...' : 'Comprehensive'}
+                    </Button>
+                  </div>
                 </div>
                 <Textarea
                   value={evaluationData.alur_permasalahan}
@@ -577,6 +636,43 @@ export default function HazardEvaluationPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Comprehensive Recommendations Display */}
+        {showComprehensive && comprehensiveRecommendations && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Rekomendasi HIRA Komprehensif
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowComprehensive(false)}
+                >
+                  Tutup
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ComprehensiveRecommendationDisplay 
+                recommendations={comprehensiveRecommendations}
+                onCopyToForm={(section, content) => {
+                  if (section === 'rootCause') {
+                    setEvaluationData(prev => ({ ...prev, alur_permasalahan: content }));
+                  } else if (section === 'action') {
+                    setEvaluationData(prev => ({ ...prev, tindakan: content }));
+                  }
+                  toast({
+                    title: 'Copied to Form',
+                    description: 'Content has been copied to the form fields',
+                  });
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Image Dialog */}
         <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>

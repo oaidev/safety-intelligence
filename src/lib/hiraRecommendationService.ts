@@ -7,6 +7,50 @@ interface HiraRecommendation {
   message?: string;
 }
 
+interface ComprehensiveHiraRecommendation {
+  source: 'hira' | 'ai';
+  confidence: number;
+  
+  // Akar Masalah Potensial (4 faktor)
+  potentialRootCauses: {
+    humanFactors: string[];
+    systemFactors: string[];
+    environmentalFactors: string[];
+    organizationalFactors: string[];
+  };
+  
+  // Tindakan Perbaikan (Hierarchy of Controls)
+  correctiveActions: {
+    elimination: string[];
+    substitution: string[];
+    engineeringControls: string[];
+    administrativeControls: string[];
+  };
+  
+  // Kontrol Pencegahan
+  preventiveControls: {
+    procedural: string[];
+    technical: string[];
+    management: string[];
+  };
+  
+  // Kontrol Deteksi
+  detectiveControls: {
+    routineInspections: string[];
+    continuousMonitoring: string[];
+    auditsAndReview: string[];
+  };
+  
+  // Kontrol Mitigasi
+  mitigativeControls: {
+    emergencyResponse: string[];
+    damageControl: string[];
+    recoveryPlans: string[];
+  };
+  
+  message?: string;
+}
+
 class HiraRecommendationService {
   
   // Search HIRA knowledge base for relevant recommendations using vector similarity
@@ -121,6 +165,90 @@ class HiraRecommendationService {
     }
   }
   
+  // Enhanced comprehensive recommendations
+  async getComprehensiveRecommendations(
+    hazardDescription: string, 
+    location: string, 
+    nonCompliance: string
+  ): Promise<ComprehensiveHiraRecommendation> {
+    try {
+      console.log('[HIRA] Getting comprehensive recommendations...');
+      
+      const { data, error } = await supabase.functions.invoke('comprehensive-hira-recommendations', {
+        body: {
+          hazard_description: hazardDescription,
+          location: location,
+          non_compliance: nonCompliance
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.success && data.recommendations) {
+        return {
+          ...data.recommendations,
+          source: 'hira',
+          message: 'Rekomendasi komprehensif berdasarkan HIRA knowledge base'
+        };
+      }
+
+      // Fallback to basic recommendations
+      const basic = await this.getRecommendations(hazardDescription, location, nonCompliance);
+      return this.convertToComprehensive(basic);
+
+    } catch (error) {
+      console.error('[HIRA] Error getting comprehensive recommendations:', error);
+      
+      // Fallback to basic recommendations
+      const basic = await this.getRecommendations(hazardDescription, location, nonCompliance);
+      return this.convertToComprehensive(basic);
+    }
+  }
+
+  // Convert basic recommendation to comprehensive format
+  private convertToComprehensive(basic: HiraRecommendation): ComprehensiveHiraRecommendation {
+    return {
+      source: basic.source,
+      confidence: basic.source === 'hira' ? 0.8 : 0.6,
+      
+      potentialRootCauses: {
+        humanFactors: [basic.rootCause || 'Perlu investigasi mendalam untuk menentukan faktor manusia'],
+        systemFactors: ['Evaluasi sistem dan prosedur yang ada'],
+        environmentalFactors: ['Analisis kondisi lingkungan kerja'],
+        organizationalFactors: ['Review struktur organisasi dan komunikasi']
+      },
+      
+      correctiveActions: {
+        elimination: ['Evaluasi kemungkinan eliminasi hazard'],
+        substitution: ['Pertimbangkan substitusi dengan alternatif yang lebih aman'],
+        engineeringControls: [basic.correctiveAction || 'Implementasi kontrol teknis'],
+        administrativeControls: ['Perbaikan prosedur dan pelatihan']
+      },
+      
+      preventiveControls: {
+        procedural: ['Perbaikan prosedur operasi standar', 'Implementasi sistem permit to work'],
+        technical: ['Maintenance preventif peralatan', 'Inspeksi berkala sistem keselamatan'],
+        management: ['Pengawasan berkelanjutan', 'Review manajemen berkala']
+      },
+      
+      detectiveControls: {
+        routineInspections: ['Inspeksi harian area kerja', 'Checklist keselamatan rutin'],
+        continuousMonitoring: ['Monitoring kondisi peralatan', 'Observasi perilaku kerja'],
+        auditsAndReview: ['Audit keselamatan berkala', 'Review efektivitas kontrol']
+      },
+      
+      mitigativeControls: {
+        emergencyResponse: ['Prosedur tanggap darurat', 'Pelatihan emergency response'],
+        damageControl: ['Rencana containment', 'Sistem komunikasi darurat'],
+        recoveryPlans: ['Prosedur investigasi insiden', 'Program lessons learned']
+      },
+      
+      message: basic.message || 'Rekomendasi dasar telah dikonversi ke format komprehensif'
+    };
+  }
+
   // Main function to get recommendations
   async getRecommendations(hazardDescription: string, location: string, nonCompliance: string): Promise<HiraRecommendation> {
     try {
