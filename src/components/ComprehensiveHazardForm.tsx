@@ -87,17 +87,58 @@ const areaPjaMitra = [
   'PJA HRM (Coal Getting & Hauling) KDC'
 ];
 
-const nonComplianceTypes = ['APD'];
+// Cascading dropdown data structure
+const nonComplianceData = {
+  'APD': [
+    'Tidak menggunakan APD',
+    'Mematikan pelindung, sistem alarm atau alat pelindung',
+    'Melepas pelindung, sistem alarm atau alat pelindung peralatan pelindung diri tidak tersedia',
+    'Cara Penggunaan APD',
+    'Kesesuaian dan Kelayakan APD'
+  ],
+  'Pelanggaran bekerja di ketinggian': [
+    'Bekerja tanpa safety body harness',
+    'Penggunaan safety body harness tidak double lanyard'
+  ],
+  'Pelanggaran Dumping di Disposal': [
+    'Karyawan tidur di area disposal',
+    'Tidak ada bendera batas dumping',
+    'Bendera Batas Dumping tidak di update',
+    'Tidak terdapat pita batas penimbunan',
+    'Dumping melewati bibir tebing (crest line)',
+    'Overdump'
+  ],
+  'Pelanggaran OB Removal atau Coal Getting': [
+    'Top Loading tanpa tanggul belakang HD',
+    'Terdapat unit parkir di dekat tebing (kurang dari 1,5 tinggi tebing)'
+  ],
+  'Pengawasan': [
+    'Tidak mengisi Form/Checklist',
+    'Kompetensi Pengawas (Tidak memiliki kartu kompetensi)',
+    'Tidak ada pengawas',
+    'Ketidak sesuaian dengan Plan (e.g DOP, Design, dll.)',
+    'Pengawas Pekerjaan yang tidak memadai',
+    'Pengawas berada di luar kabin atau pos pengawas di area Pit',
+    'Tidak Ada Traffic Man Yang Mengatur Lalu Lintas'
+  ],
+  'Pengoperasian Kendaraan / unit': [
+    'Over speed',
+    'Melanggar rambu lalu lintas tambang',
+    'Fatigue',
+    'Jarak Tidak Aman',
+    'Pengoperasian Tanpa License (SIMPER Tidak Ada, SIMPER Expired)',
+    'Pengoperasian Tanpa Sabuk Pengaman',
+    'Melakukan kegiatan lain saat mengoperasikan unit',
+    'Komunikasi 2 arah',
+    'Membiarkan engine menyala',
+    'Tidak ada SKO / SKO Expired',
+    'Meninggalkan kunci kontak di unit/kendaraan pada saat parkir',
+    'Melakukan kegiatan makan/minum',
+    'Melintas pada Jalur Berlawanan'
+  ]
+};
 
-const subNonComplianceTypes = [
-  'Cara Penggunaan APD',
-  'Kelambu pelindung lebah (eksplorasi) tidak layak/tidak ada/tidak sesuai',
-  'Kesesuaian dan Kelayakan APD',
-  'Melepas pelindung, sistem alarm atau alat pelindung peralatan pelindung diri tidak tersedia',
-  'Mematikan pelindung, sistem alarm atau alat pelindung',
-  'Pengawas Tidak Memastikan Kesesuaian dan Kelayakan APD Pekerja Saat Aktivitas Telah Berlangsung',
-  'Tidak menggunakan APD'
-];
+const nonComplianceTypes = Object.keys(nonComplianceData);
 
 const quickActions = [
   'Atur kecepatan dan jarak',
@@ -656,13 +697,20 @@ Keterangan Lokasi: ${data.locationDescription}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Ketidaksesuaian</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Reset sub ketidaksesuaian when main category changes
+                            form.setValue('subNonCompliance', '');
+                          }} 
+                          value={field.value}
+                        >
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih ketidaksesuaian" />
+                            <SelectTrigger className="bg-background">
+                              <SelectValue placeholder="Pilih Ketidaksesuaian" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="bg-background border border-border z-50">
                             {nonComplianceTypes.map((type) => (
                               <SelectItem key={type} value={type}>
                                 {type}
@@ -677,26 +725,42 @@ Keterangan Lokasi: ${data.locationDescription}
                   <FormField
                     control={form.control}
                     name="subNonCompliance"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sub Ketidaksesuaian</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih sub ketidaksesuaian" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {subNonComplianceTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const selectedMainCategory = form.watch('nonCompliance');
+                      const subOptions = selectedMainCategory ? nonComplianceData[selectedMainCategory as keyof typeof nonComplianceData] || [] : [];
+                      const isDisabled = !selectedMainCategory;
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Sub Ketidaksesuaian</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value}
+                            disabled={isDisabled}
+                          >
+                            <FormControl>
+                              <SelectTrigger className={`bg-background ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                <SelectValue 
+                                  placeholder={
+                                    isDisabled 
+                                      ? "Pilih Ketidaksesuaian terlebih dahulu" 
+                                      : "Pilih Sub Ketidaksesuaian"
+                                  } 
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border border-border z-50">
+                              {subOptions.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
                 </div>
                 <div className="space-y-4">
