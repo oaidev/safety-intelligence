@@ -276,66 +276,76 @@ class HiraRecommendationService {
       const hiraSearch = await this.searchHiraRecommendations(hazardDescription);
       
       if (hiraSearch.hasResults && hiraSearch.contexts.length > 0) {
-        console.log('[HIRA] Found contexts, parsing HIRA data...');
+        console.log('[HIRA] Found contexts, parsing colon-separated HIRA data...');
         console.log('[HIRA] Raw contexts:', hiraSearch.contexts);
         
-        // Parse HIRA content - new format with "Akar Permasalahan:" and "Tindakan Perbaikan:" sections
+        // Parse colon-separated HIRA data format: Activity:Sub-activity:Task:RootCause:Consequence:ControlType:ControlAction
         const rootCauses = new Set<string>();
-        const actions = new Set<string>();
+        const consequences = new Set<string>();
+        const actionsByType = new Map<string, Set<string>>();
         
         hiraSearch.contexts.forEach(context => {
-          // Look for "Akar Permasalahan:" section
-          const akarMatch = context.match(/Akar Permasalahan:([^]+?)(?=Tindakan Perbaikan:|$)/i);
-          if (akarMatch) {
-            const akarSection = akarMatch[1];
-            // Extract bullet points after "Akar Permasalahan:"
-            const akarPoints = akarSection.match(/[-•]\s*([^-•\n]+)/g);
-            if (akarPoints) {
-              akarPoints.forEach(point => {
-                const cleanPoint = point.replace(/^[-•]\s*/, '').trim();
-                if (cleanPoint) {
-                  rootCauses.add(cleanPoint);
-                }
-              });
-            }
-          }
+          // Split by colons to get the fields
+          const fields = context.split(':');
           
-          // Look for "Tindakan Perbaikan:" section
-          const tindakanMatch = context.match(/Tindakan Perbaikan:([^]+?)$/i);
-          if (tindakanMatch) {
-            const tindakanSection = tindakanMatch[1];
-            // Extract bullet points after "Tindakan Perbaikan:"
-            const tindakanPoints = tindakanSection.match(/[-•]\s*([^-•\n]+)/g);
-            if (tindakanPoints) {
-              tindakanPoints.forEach(point => {
-                const cleanPoint = point.replace(/^[-•]\s*/, '').trim();
-                if (cleanPoint) {
-                  actions.add(cleanPoint);
-                }
-              });
+          if (fields.length >= 7) {
+            // Field 3 (index 3): Root Cause
+            const rootCause = fields[3]?.trim();
+            if (rootCause && rootCause.length > 0) {
+              rootCauses.add(rootCause);
             }
+            
+            // Field 4 (index 4): Consequence
+            const consequence = fields[4]?.trim();
+            if (consequence && consequence.length > 0) {
+              consequences.add(consequence);
+            }
+            
+            // Field 5 (index 5): Control Type
+            // Field 6 (index 6): Control Action  
+            const controlType = fields[5]?.trim();
+            const controlAction = fields[6]?.trim();
+            
+            if (controlType && controlAction && controlType.length > 0 && controlAction.length > 0) {
+              if (!actionsByType.has(controlType)) {
+                actionsByType.set(controlType, new Set());
+              }
+              actionsByType.get(controlType)!.add(controlAction);
+            }
+          } else {
+            console.log(`[HIRA] Skipping malformed context: ${context.substring(0, 100)}...`);
           }
         });
         
         console.log('[HIRA] Extracted root causes:', Array.from(rootCauses));
-        console.log('[HIRA] Extracted actions:', Array.from(actions));
+        console.log('[HIRA] Extracted consequences:', Array.from(consequences));
+        console.log('[HIRA] Extracted actions by type:', Object.fromEntries(actionsByType));
         
-        // Format as bullet points
-        const formattedRootCauses = Array.from(rootCauses).length > 0 
-          ? Array.from(rootCauses).map(cause => `- ${cause}`).join('\n')
+        // Format as bullet points - combine root causes and consequences
+        const allRootCauses = new Set([...rootCauses, ...consequences]);
+        const formattedRootCauses = allRootCauses.size > 0 
+          ? Array.from(allRootCauses).map(cause => `- ${cause}`).join('\n')
           : '- Perlu investigasi mendalam untuk menentukan akar masalah yang tepat';
-          
-        const formattedActions = Array.from(actions).length > 0
-          ? Array.from(actions).map(action => `- ${action}`).join('\n')
+        
+        // Format actions by control type
+        const formattedActions: string[] = [];
+        actionsByType.forEach((actions, controlType) => {
+          actions.forEach(action => {
+            formattedActions.push(`- Control ${controlType}: ${action}`);
+          });
+        });
+        
+        const finalFormattedActions = formattedActions.length > 0
+          ? formattedActions.join('\n')
           : '- Control Preventive: Implementasi prosedur keselamatan yang ketat';
         
         console.log('[HIRA] Successfully formatted HIRA recommendations');
         console.log('[HIRA] Final root causes:', formattedRootCauses);
-        console.log('[HIRA] Final actions:', formattedActions);
+        console.log('[HIRA] Final actions:', finalFormattedActions);
         
         return {
           rootCauses: formattedRootCauses,
-          correctiveActions: formattedActions,
+          correctiveActions: finalFormattedActions,
           source: 'hira',
           message: 'Rekomendasi berdasarkan HIRA knowledge base'
         };
