@@ -92,17 +92,39 @@ serve(async (req) => {
 
         const data = await response.json();
         
+        // Debug logging: Log the full response structure
+        console.log(`[BatchAnalysis] Raw Gemini response for ${analysis.knowledgeBaseName}:`, JSON.stringify(data, null, 2));
+        
         if (!data.candidates || data.candidates.length === 0) {
+          console.error(`[BatchAnalysis] No candidates in response:`, data);
           throw new Error('No response generated from API');
         }
 
-        // Safely access nested properties
+        // Safely access nested properties with more robust parsing
         const candidate = data.candidates[0];
-        if (!candidate || !candidate.content || !candidate.content.parts || !candidate.content.parts[0]) {
-          throw new Error('Invalid response structure from API');
+        console.log(`[BatchAnalysis] Candidate structure:`, JSON.stringify(candidate, null, 2));
+        
+        let fullResponse = '';
+        
+        // Try multiple response structures
+        if (candidate?.content?.parts?.[0]?.text) {
+          fullResponse = candidate.content.parts[0].text;
+        } else if (candidate?.output) {
+          fullResponse = candidate.output;
+        } else if (candidate?.text) {
+          fullResponse = candidate.text;
+        } else if (typeof candidate === 'string') {
+          fullResponse = candidate;
+        } else {
+          console.error(`[BatchAnalysis] Unexpected response structure:`, candidate);
+          throw new Error(`Invalid response structure from API. Expected text content but got: ${JSON.stringify(candidate)}`);
         }
         
-        const fullResponse = candidate.content.parts[0].text || 'No response generated';
+        if (!fullResponse || fullResponse.trim() === '') {
+          fullResponse = 'No response generated';
+        }
+        
+        console.log(`[BatchAnalysis] Parsed response for ${analysis.knowledgeBaseName}:`, fullResponse);
         
         // Parse response
         const categoryMatch = fullResponse.match(/KATEGORI(?:\s+\w+)?:\s*(.+?)(?:\n|$)/i);
