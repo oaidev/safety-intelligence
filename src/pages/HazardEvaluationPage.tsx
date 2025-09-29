@@ -145,12 +145,12 @@ export default function HazardEvaluationPage() {
     }
   };
 
-  const generateHiraRecommendations = async () => {
+  const generateRecommendations = async () => {
     if (!report) return;
     
     try {
       setGeneratingRecommendations(true);
-      const recommendations = await hiraRecommendationService.getRecommendations(
+      const formatted = await hiraRecommendationService.getFormattedRecommendations(
         report.finding_description,
         report.location,
         report.non_compliance
@@ -158,16 +158,16 @@ export default function HazardEvaluationPage() {
 
       setEvaluationData(prev => ({
         ...prev,
-        alur_permasalahan: recommendations.rootCause,
-        tindakan: recommendations.correctiveAction
+        alur_permasalahan: formatted.rootCauses,
+        tindakan: formatted.correctiveActions
       }));
 
       toast({
-        title: recommendations.source === 'hira' ? 'HIRA Recommendation' : 'AI Recommendation',
-        description: recommendations.message || 'Rekomendasi telah dihasilkan',
+        title: formatted.source === 'hira' ? 'HIRA Recommendation' : 'AI Recommendation',
+        description: formatted.message,
       });
     } catch (error) {
-      console.error('Error generating HIRA recommendations:', error);
+      console.error('Error generating recommendations:', error);
       toast({
         title: 'Error',
         description: 'Failed to generate recommendations',
@@ -178,50 +178,6 @@ export default function HazardEvaluationPage() {
     }
   };
 
-  const generateComprehensiveRecommendations = async () => {
-    if (!report) return;
-    
-    try {
-      setGeneratingRecommendations(true);
-      const comprehensive = await hiraRecommendationService.getComprehensiveRecommendations(
-        report.finding_description,
-        report.location,
-        report.non_compliance
-      );
-
-      setComprehensiveRecommendations(comprehensive);
-      setShowComprehensive(true);
-
-      // Also update basic fields for compatibility
-      const basicRootCause = comprehensive.potentialRootCauses.humanFactors[0] || 
-                           comprehensive.potentialRootCauses.systemFactors[0] ||
-                           'Perlu investigasi mendalam';
-      
-      const basicAction = comprehensive.correctiveActions.engineeringControls[0] ||
-                         comprehensive.correctiveActions.administrativeControls[0] ||
-                         'Implementasi kontrol yang sesuai';
-
-      setEvaluationData(prev => ({
-        ...prev,
-        alur_permasalahan: basicRootCause,
-        tindakan: basicAction
-      }));
-
-      toast({
-        title: 'Comprehensive HIRA Analysis',
-        description: comprehensive.message || 'Rekomendasi komprehensif telah dihasilkan',
-      });
-    } catch (error) {
-      console.error('Error generating comprehensive recommendations:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate comprehensive recommendations',
-        variant: 'destructive',
-      });
-    } finally {
-      setGeneratingRecommendations(false);
-    }
-  };
 
   const saveEvaluation = async () => {
     if (!report) return;
@@ -549,26 +505,23 @@ export default function HazardEvaluationPage() {
                     <Target className="h-4 w-4" />
                     Akar Permasalahan
                   </Label>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={generateHiraRecommendations}
-                      disabled={generatingRecommendations}
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      {generatingRecommendations ? 'Generating...' : 'Basic'}
-                    </Button>
-                    <Button 
-                      variant="default" 
-                      size="sm"
-                      onClick={generateComprehensiveRecommendations}
-                      disabled={generatingRecommendations}
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      {generatingRecommendations ? 'Generating...' : 'Comprehensive'}
-                    </Button>
-                  </div>
+                  <Button 
+                    onClick={generateRecommendations}
+                    disabled={generatingRecommendations}
+                    className="w-full"
+                  >
+                    {generatingRecommendations ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Recommendation
+                      </>
+                    )}
+                  </Button>
                 </div>
                 <Textarea
                   value={evaluationData.alur_permasalahan}
