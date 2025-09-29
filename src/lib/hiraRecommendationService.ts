@@ -257,69 +257,52 @@ class HiraRecommendationService {
     message: string;
   }> {
     try {
+      console.log('[HIRA] Getting formatted recommendations for:', hazardDescription.substring(0, 100));
+      
       // Search HIRA knowledge base first
       const hiraSearch = await this.searchHiraRecommendations(hazardDescription);
       
       if (hiraSearch.hasResults && hiraSearch.contexts.length > 0) {
-        // Parse HIRA content for structured data
-        const hiraContent = hiraSearch.contexts.join('\n\n').toLowerCase();
+        console.log('[HIRA] Found contexts, parsing HIRA data...');
         
-        // Extract root causes
-        const rootCauses = [];
-        const rootCauseKeywords = ['fatigue', 'kelelahan', 'kurang konsentrasi', 'tidak fokus', 'human error', 'pelatihan kurang', 'prosedur tidak diikuti'];
+        // Parse HIRA content - format: Activity:Sub-activity:Task:Root Cause:Consequence:Control Type:Control Action
+        const rootCauses = new Set<string>();
+        const actions = new Set<string>();
         
-        for (const keyword of rootCauseKeywords) {
-          if (hiraContent.includes(keyword)) {
-            if (keyword.includes('fatigue') || keyword.includes('kelelahan')) {
-              rootCauses.push('Kurang konsentrasi dalam melakukan pekerjaan (kelelahan/fatigue) menyebabkan unit menabrak sesuatu');
-            } else if (keyword.includes('konsentrasi') || keyword.includes('fokus')) {
-              rootCauses.push('Operator kurang fokus dan konsentrasi saat melakukan operasional');
-            } else if (keyword.includes('prosedur')) {
-              rootCauses.push('Tidak mengikuti prosedur keselamatan yang telah ditetapkan');
+        hiraSearch.contexts.forEach(context => {
+          const parts = context.split(':');
+          if (parts.length >= 7) {
+            const rootCause = parts[3]?.trim();
+            const consequence = parts[4]?.trim();
+            const controlType = parts[5]?.trim();
+            const controlAction = parts[6]?.trim();
+            
+            // Add root causes
+            if (rootCause) {
+              rootCauses.add(rootCause);
+            }
+            if (consequence) {
+              rootCauses.add(consequence);
+            }
+            
+            // Add control actions with proper prefix
+            if (controlAction && controlType) {
+              const formattedAction = `Control ${controlType}: ${controlAction}`;
+              actions.add(formattedAction);
             }
           }
-        }
-        
-        // Add consequence-based root causes
-        if (hiraContent.includes('menabrak') || hiraContent.includes('tabrakan') || hiraContent.includes('collision')) {
-          rootCauses.push('Unit menabrak sesuatu sehingga unit mengalami kerusakan hingga cedera pada operator');
-        }
-        
-        // Extract corrective actions by control type
-        const actions = [];
-        
-        // Preventive controls
-        if (hiraContent.includes('fatigue') || hiraContent.includes('fit to work')) {
-          actions.push('Control Preventive: Memastikan operator unit fit untuk bekerja sesuai prosedur fatigue management melalui form fit to work');
-        }
-        if (hiraContent.includes('komunikasi') || hiraContent.includes('pengawas')) {
-          actions.push('Control Preventive: Pengawas melakukan komunikasi kontak positif dengan operator');
-        }
-        if (hiraContent.includes('training') || hiraContent.includes('pelatihan')) {
-          actions.push('Control Preventive: Pelatihan berkala untuk operator tentang prosedur keselamatan');
-        }
-        
-        // Detective controls
-        if (hiraContent.includes('observasi') || hiraContent.includes('pengawasan')) {
-          actions.push('Control Detective: Pengawas melakukan observasi operator saat bekerja');
-        }
-        if (hiraContent.includes('inspeksi')) {
-          actions.push('Control Detective: Inspeksi rutin kondisi unit dan peralatan keselamatan');
-        }
-        
-        // Engineering controls  
-        if (hiraContent.includes('alarm') || hiraContent.includes('warning')) {
-          actions.push('Control Engineering: Instalasi sistem peringatan dan alarm pada unit');
-        }
+        });
         
         // Format as bullet points
-        const formattedRootCauses = rootCauses.length > 0 
-          ? rootCauses.map(cause => `- ${cause}`).join('\n')
-          : '- Perlu investigasi mendalam untuk menentukan akar masalah yang tepat\n- Faktor manusia dan sistem perlu dievaluasi lebih lanjut';
+        const formattedRootCauses = Array.from(rootCauses).length > 0 
+          ? Array.from(rootCauses).map(cause => `- ${cause}`).join('\n')
+          : '- Perlu investigasi mendalam untuk menentukan akar masalah yang tepat';
           
-        const formattedActions = actions.length > 0
-          ? actions.map(action => `- ${action}`).join('\n')
-          : '- Control Preventive: Implementasi prosedur keselamatan yang ketat\n- Control Detective: Monitoring dan inspeksi berkala\n- Control Engineering: Pemasangan peralatan keselamatan tambahan';
+        const formattedActions = Array.from(actions).length > 0
+          ? Array.from(actions).map(action => `- ${action}`).join('\n')
+          : '- Control Preventive: Implementasi prosedur keselamatan yang ketat';
+        
+        console.log('[HIRA] Successfully formatted HIRA recommendations');
         
         return {
           rootCauses: formattedRootCauses,
@@ -330,7 +313,7 @@ class HiraRecommendationService {
       }
       
       // Fallback to AI with structured format
-      console.log('[HIRA] No HIRA match found, using AI with structured format');
+      console.log('[HIRA] No HIRA match found, using AI fallback');
       
       const formattedRootCauses = `- Kurang konsentrasi dalam melakukan pekerjaan yang dapat menyebabkan insiden
 - Tidak mengikuti prosedur keselamatan yang telah ditetapkan
