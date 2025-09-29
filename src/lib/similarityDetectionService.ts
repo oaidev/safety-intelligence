@@ -36,6 +36,14 @@ class SimilarityDetectionService {
       const lng = parseFloat(submissionData.longitude || '0');
       const hasValidCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
 
+      console.log('Similarity Check - Input coordinates:', {
+        input_lat: submissionData.latitude,
+        input_lng: submissionData.longitude,
+        parsed_lat: lat,
+        parsed_lng: lng,
+        hasValidCoords
+      });
+
       // Base query for similar hazards in the last 7 days
       let query = supabase
         .from('hazard_reports')
@@ -77,59 +85,101 @@ class SimilarityDetectionService {
         let similarityScore = 0;
         let distanceKm: number | undefined;
 
+        console.log(`\n=== Comparing with hazard ${hazard.tracking_id} ===`);
+        console.log('Stored coordinates:', {
+          stored_lat: hazard.latitude,
+          stored_lng: hazard.longitude,
+          stored_lat_type: typeof hazard.latitude,
+          stored_lng_type: typeof hazard.longitude
+        });
+
         // 1. Location radius similarity (within 1km radius) - Weight: 0.25
+        let locationRadiusScore = 0;
         if (hasValidCoords && hazard.latitude && hazard.longitude) {
-          distanceKm = this.calculateDistance(
-            lat,
-            lng,
-            hazard.latitude,
-            hazard.longitude
-          );
+          const storedLat = parseFloat(hazard.latitude.toString());
+          const storedLng = parseFloat(hazard.longitude.toString());
+          
+          console.log('Distance calculation:', {
+            input_coords: [lat, lng],
+            stored_coords: [storedLat, storedLng],
+            coords_valid: !isNaN(storedLat) && !isNaN(storedLng)
+          });
+
+          distanceKm = this.calculateDistance(lat, lng, storedLat, storedLng);
+          
+          console.log('Distance result:', { distance_km: distanceKm });
 
           if (distanceKm <= 1.0) {
+            locationRadiusScore = 0.25;
             similarityScore += 0.25;
+            console.log('✅ Location radius match: +0.25');
+          } else {
+            console.log(`❌ Distance too far: ${distanceKm}km > 1km`);
           }
+        } else {
+          console.log('❌ No valid coordinates for radius comparison');
         }
 
         // 2. Location name exact match - Weight: 0.20
+        let locationNameScore = 0;
         if (this.normalizeText(hazard.location) === this.normalizeText(submissionData.location)) {
+          locationNameScore = 0.20;
           similarityScore += 0.20;
+          console.log('✅ Location name match: +0.20');
+        } else {
+          console.log(`❌ Location name mismatch: "${this.normalizeText(hazard.location)}" vs "${this.normalizeText(submissionData.location)}"`);
         }
 
         // 3. Detail location exact match - Weight: 0.15
+        let detailLocationScore = 0;
         if (submissionData.detail_location && hazard.detail_location && 
             this.normalizeText(hazard.detail_location) === this.normalizeText(submissionData.detail_location)) {
+          detailLocationScore = 0.15;
           similarityScore += 0.15;
+          console.log('✅ Detail location match: +0.15');
+        } else {
+          console.log(`❌ Detail location mismatch: "${hazard.detail_location}" vs "${submissionData.detail_location}"`);
         }
 
         // 4. Non-compliance exact match - Weight: 0.15
+        let nonComplianceScore = 0;
         if (this.normalizeText(hazard.non_compliance) === this.normalizeText(submissionData.non_compliance)) {
+          nonComplianceScore = 0.15;
           similarityScore += 0.15;
+          console.log('✅ Non-compliance match: +0.15');
+        } else {
+          console.log(`❌ Non-compliance mismatch: "${this.normalizeText(hazard.non_compliance)}" vs "${this.normalizeText(submissionData.non_compliance)}"`);
         }
 
         // 5. Sub non-compliance exact match - Weight: 0.10
+        let subNonComplianceScore = 0;
         if (this.normalizeText(hazard.sub_non_compliance) === this.normalizeText(submissionData.sub_non_compliance)) {
+          subNonComplianceScore = 0.10;
           similarityScore += 0.10;
+          console.log('✅ Sub non-compliance match: +0.10');
+        } else {
+          console.log(`❌ Sub non-compliance mismatch: "${this.normalizeText(hazard.sub_non_compliance)}" vs "${this.normalizeText(submissionData.sub_non_compliance)}"`);
         }
 
         // 6. Finding description semantic similarity - Weight: 0.15
+        // Extract just the description from stored format if it contains "Deskripsi Temuan:"
+        const extractedDescription = this.extractDescriptionFromStored(hazard.finding_description);
         const descriptionSimilarity = this.calculateTextSimilarity(
           submissionData.finding_description,
-          hazard.finding_description
+          extractedDescription
         );
-        similarityScore += descriptionSimilarity * 0.15;
-
-        console.log(`Hazard ${hazard.tracking_id} similarity breakdown:`, {
-          location_radius: hasValidCoords && distanceKm && distanceKm <= 1.0 ? 0.25 : 0,
-          location_name: this.normalizeText(hazard.location) === this.normalizeText(submissionData.location) ? 0.20 : 0,
-          detail_location: submissionData.detail_location && hazard.detail_location && 
-                          this.normalizeText(hazard.detail_location) === this.normalizeText(submissionData.detail_location) ? 0.15 : 0,
-          non_compliance: this.normalizeText(hazard.non_compliance) === this.normalizeText(submissionData.non_compliance) ? 0.15 : 0,
-          sub_non_compliance: this.normalizeText(hazard.sub_non_compliance) === this.normalizeText(submissionData.sub_non_compliance) ? 0.10 : 0,
-          description_similarity: descriptionSimilarity * 0.15,
-          total_score: similarityScore,
-          distance_km: distanceKm
+        const descriptionScore = descriptionSimilarity * 0.15;
+        similarityScore += descriptionScore;
+        
+        console.log('Description comparison:', {
+          input_description: submissionData.finding_description,
+          stored_raw: hazard.finding_description,
+          stored_extracted: extractedDescription,
+          similarity: descriptionSimilarity,
+          score: descriptionScore
         });
+
+        console.log(`Final similarity score: ${similarityScore} (${(similarityScore * 100).toFixed(1)}%)`);
 
         // Only include if similarity score is above threshold (0.7)
         if (similarityScore >= 0.7) {
@@ -177,6 +227,26 @@ class SimilarityDetectionService {
 
   private normalizeText(text: string): string {
     return text.toLowerCase().trim().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Extract just the description text from stored finding_description that may contain formatting
+   * Example: "Ketidaksesuaian: APD\nSub Ketidaksesuaian: Cara Penggunaan APD\nDeskripsi Temuan: tidak pakai apd di ketinggian"
+   * Should return: "tidak pakai apd di ketinggian"
+   */
+  private extractDescriptionFromStored(storedDescription: string): string {
+    if (!storedDescription) return '';
+    
+    // Look for "Deskripsi Temuan:" pattern and extract what comes after it
+    const deskripsiPattern = /Deskripsi Temuan:\s*(.+?)(?:\n|$)/i;
+    const match = storedDescription.match(deskripsiPattern);
+    
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    
+    // If no pattern found, return the original description
+    return storedDescription;
   }
 
   /**
