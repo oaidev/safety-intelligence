@@ -15,6 +15,7 @@ interface SimilarHazard {
   non_compliance: string;
   sub_non_compliance: string;
   finding_description: string;
+  status: string;
   created_at: string;
   distance_km?: number;
   similarity_score?: number;
@@ -36,6 +37,23 @@ export function SimilarityCheckDialog({
   onEditForm
 }: SimilarityCheckDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'PENDING_REVIEW':
+        return 'Menunggu Review';
+      case 'IN_PROGRESS':
+        return 'Dalam Proses';
+      case 'COMPLETED':
+        return 'Selesai';
+      case 'DUPLIKAT':
+        return 'Duplikat';
+      case 'BUKAN_HAZARD':
+        return 'Bukan Hazard';
+      default:
+        return status;
+    }
+  };
 
   const handleContinueSubmission = () => {
     setIsSubmitting(true);
@@ -89,6 +107,11 @@ export function SimilarityCheckDialog({
                         <MapPin className="h-3 w-3" />
                         {hazard.location}
                       </span>
+                    </div>
+                    <div className="mt-2">
+                      <Badge variant="secondary" className="text-xs">
+                        Status: {getStatusLabel(hazard.status)}
+                      </Badge>
                     </div>
                   </div>
                 </div>

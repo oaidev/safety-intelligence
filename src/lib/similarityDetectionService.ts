@@ -8,6 +8,7 @@ export interface SimilarHazardData {
   non_compliance: string;
   sub_non_compliance: string;
   finding_description: string;
+  status: string;
   created_at: string;
   latitude?: number;
   longitude?: number;
@@ -45,6 +46,7 @@ class SimilarityDetectionService {
           non_compliance,
           sub_non_compliance,
           finding_description,
+          status,
           created_at,
           latitude,
           longitude

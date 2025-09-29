@@ -263,9 +263,6 @@ export default function EvaluatorDashboard() {
           />
         </div>
 
-        {/* Analysis Dashboard */}
-        <ClusterAnalysisDashboard />
-
         {/* Filters */}
         <Card>
           <CardHeader>
@@ -532,8 +529,6 @@ export default function EvaluatorDashboard() {
           </CardContent>
         </Card>
 
-        {/* Cluster Analysis Section */}
-        <ClusterAnalysisDashboard />
       </div>
     </div>
   );
