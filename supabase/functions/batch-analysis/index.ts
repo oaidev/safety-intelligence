@@ -64,7 +64,7 @@ serve(async (req) => {
         console.log(`[BatchAnalysis] Sending request ${index + 1}/${analyses.length} to Gemini API`);
 
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
           {
             method: 'POST',
             headers: {
@@ -78,7 +78,7 @@ serve(async (req) => {
               ],
               generationConfig: {
                 temperature: 0.1,
-                maxOutputTokens: 1024,
+                maxOutputTokens: 3072,
               },
             }),
           }
@@ -104,36 +104,64 @@ serve(async (req) => {
         const candidate = data.candidates[0];
         console.log(`[BatchAnalysis] Candidate structure:`, JSON.stringify(candidate, null, 2));
         
-        let fullResponse = '';
-        
-        // Try multiple response structures
-        if (candidate?.content?.parts?.[0]?.text) {
-          fullResponse = candidate.content.parts[0].text;
-        } else if (candidate?.output) {
-          fullResponse = candidate.output;
-        } else if (candidate?.text) {
-          fullResponse = candidate.text;
-        } else if (typeof candidate === 'string') {
-          fullResponse = candidate;
-        } else {
-          console.error(`[BatchAnalysis] Unexpected response structure:`, candidate);
-          throw new Error(`Invalid response structure from API. Expected text content but got: ${JSON.stringify(candidate)}`);
-        }
-        
-        if (!fullResponse || fullResponse.trim() === '') {
-          fullResponse = 'No response generated';
-        }
+         let fullResponse = '';
+         let isPartialResponse = false;
+         
+         // Check for MAX_TOKENS finish reason first
+         if (candidate?.finishReason === 'MAX_TOKENS') {
+           console.log(`[BatchAnalysis] MAX_TOKENS detected for ${analysis.knowledgeBaseName}`);
+           isPartialResponse = true;
+           
+           // Try to get partial content
+           if (candidate?.content?.parts?.[0]?.text) {
+             fullResponse = candidate.content.parts[0].text;
+           } else {
+             // Provide a fallback response when content is completely truncated
+             fullResponse = 'KATEGORI HAZARD: Response Truncated\nCONFIDENCE: Low\nALASAN: Analysis was incomplete due to token limits. Please try with a shorter hazard description or simpler context.';
+           }
+         } else {
+           // Try multiple response structures for complete responses
+           if (candidate?.content?.parts?.[0]?.text) {
+             fullResponse = candidate.content.parts[0].text;
+           } else if (candidate?.output) {
+             fullResponse = candidate.output;
+           } else if (candidate?.text) {
+             fullResponse = candidate.text;
+           } else if (typeof candidate === 'string') {
+             fullResponse = candidate;
+           } else {
+             console.error(`[BatchAnalysis] Unexpected response structure:`, candidate);
+             // Instead of throwing error, provide a fallback response
+             fullResponse = 'KATEGORI HAZARD: Analysis Error\nCONFIDENCE: Unknown\nALASAN: Unable to parse response from API. Please try again.';
+             isPartialResponse = true;
+           }
+         }
+         
+         if (!fullResponse || fullResponse.trim() === '') {
+           fullResponse = 'KATEGORI HAZARD: No Response\nCONFIDENCE: Unknown\nALASAN: No response generated from API.';
+           isPartialResponse = true;
+         }
         
         console.log(`[BatchAnalysis] Parsed response for ${analysis.knowledgeBaseName}:`, fullResponse);
         
-        // Parse response
-        const categoryMatch = fullResponse.match(/KATEGORI(?:\s+\w+)?:\s*(.+?)(?:\n|$)/i);
-        const confidenceMatch = fullResponse.match(/CONFIDENCE:\s*(.+?)(?:\n|$)/i);
-        const reasoningMatch = fullResponse.match(/ALASAN:\s*(.+?)$/is);
+         // Parse response
+         const categoryMatch = fullResponse.match(/KATEGORI(?:\s+\w+)?:\s*(.+?)(?:\n|$)/i);
+         const confidenceMatch = fullResponse.match(/CONFIDENCE:\s*(.+?)(?:\n|$)/i);
+         const reasoningMatch = fullResponse.match(/ALASAN:\s*(.+?)$/is);
 
-        const category = categoryMatch?.[1]?.trim() || 'Unknown';
-        const confidence = confidenceMatch?.[1]?.trim() || 'Unknown';
-        const reasoning = reasoningMatch?.[1]?.trim() || 'No reasoning provided';
+         let category = categoryMatch?.[1]?.trim() || 'Unknown';
+         let confidence = confidenceMatch?.[1]?.trim() || 'Unknown';
+         let reasoning = reasoningMatch?.[1]?.trim() || 'No reasoning provided';
+         
+         // Add indicators for partial responses
+         if (isPartialResponse) {
+           if (category !== 'Response Truncated' && category !== 'Analysis Error' && category !== 'No Response') {
+             category += ' (Partial)';
+           }
+           if (confidence === 'Unknown') {
+             confidence = 'Low (Truncated)';
+           }
+         }
 
         const processingTime = Date.now() - individualStartTime;
         
