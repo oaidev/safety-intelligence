@@ -77,8 +77,13 @@ class HiraRecommendationService {
       
       console.log(`[HIRA] Found ${hiraResults.length} relevant chunks with similarity search`);
       
-      // Filter results with decent similarity scores (> 0.3)
-      const relevantChunks = hiraResults.filter(result => result.similarity > 0.3);
+      // Log similarity scores for debugging
+      hiraResults.forEach((result, index) => {
+        console.log(`[HIRA] Chunk ${index + 1}: similarity = ${result.similarity.toFixed(4)}, preview: "${result.text.substring(0, 100)}..."`);
+      });
+      
+      // Lower similarity threshold to 0.15 for better matching
+      const relevantChunks = hiraResults.filter(result => result.similarity > 0.15);
       
       return {
         contexts: relevantChunks.map(chunk => chunk.text),
@@ -100,14 +105,22 @@ class HiraRecommendationService {
           return { contexts: [], hasResults: false };
         }
         
-        // Simple text matching as fallback
+        // Enhanced text matching as fallback
+        const queryWords = hazardDescription.toLowerCase().split(' ')
+          .filter(word => word.length > 3);
+        
         const relevantChunks = hiraChunks.filter(chunk => {
           const chunkText = chunk.chunk_text.toLowerCase();
-          const queryWords = hazardDescription.toLowerCase().split(' ');
           
-          return queryWords.some(word => 
-            word.length > 3 && chunkText.includes(word)
-          );
+          // Check for key HIRA keywords and query matches
+          const hasHiraKeywords = chunkText.includes('akar permasalahan') || 
+                                  chunkText.includes('tindakan perbaikan') ||
+                                  chunkText.includes('control preventive') ||
+                                  chunkText.includes('control detective');
+          
+          const hasQueryMatch = queryWords.some(word => chunkText.includes(word));
+          
+          return hasHiraKeywords && hasQueryMatch;
         });
         
         console.log(`[HIRA] Fallback text search found ${relevantChunks.length} chunks`);
@@ -264,34 +277,48 @@ class HiraRecommendationService {
       
       if (hiraSearch.hasResults && hiraSearch.contexts.length > 0) {
         console.log('[HIRA] Found contexts, parsing HIRA data...');
+        console.log('[HIRA] Raw contexts:', hiraSearch.contexts);
         
-        // Parse HIRA content - format: Activity:Sub-activity:Task:Root Cause:Consequence:Control Type:Control Action
+        // Parse HIRA content - new format with "Akar Permasalahan:" and "Tindakan Perbaikan:" sections
         const rootCauses = new Set<string>();
         const actions = new Set<string>();
         
         hiraSearch.contexts.forEach(context => {
-          const parts = context.split(':');
-          if (parts.length >= 7) {
-            const rootCause = parts[3]?.trim();
-            const consequence = parts[4]?.trim();
-            const controlType = parts[5]?.trim();
-            const controlAction = parts[6]?.trim();
-            
-            // Add root causes
-            if (rootCause) {
-              rootCauses.add(rootCause);
+          // Look for "Akar Permasalahan:" section
+          const akarMatch = context.match(/Akar Permasalahan:([^]+?)(?=Tindakan Perbaikan:|$)/i);
+          if (akarMatch) {
+            const akarSection = akarMatch[1];
+            // Extract bullet points after "Akar Permasalahan:"
+            const akarPoints = akarSection.match(/[-•]\s*([^-•\n]+)/g);
+            if (akarPoints) {
+              akarPoints.forEach(point => {
+                const cleanPoint = point.replace(/^[-•]\s*/, '').trim();
+                if (cleanPoint) {
+                  rootCauses.add(cleanPoint);
+                }
+              });
             }
-            if (consequence) {
-              rootCauses.add(consequence);
-            }
-            
-            // Add control actions with proper prefix
-            if (controlAction && controlType) {
-              const formattedAction = `Control ${controlType}: ${controlAction}`;
-              actions.add(formattedAction);
+          }
+          
+          // Look for "Tindakan Perbaikan:" section
+          const tindakanMatch = context.match(/Tindakan Perbaikan:([^]+?)$/i);
+          if (tindakanMatch) {
+            const tindakanSection = tindakanMatch[1];
+            // Extract bullet points after "Tindakan Perbaikan:"
+            const tindakanPoints = tindakanSection.match(/[-•]\s*([^-•\n]+)/g);
+            if (tindakanPoints) {
+              tindakanPoints.forEach(point => {
+                const cleanPoint = point.replace(/^[-•]\s*/, '').trim();
+                if (cleanPoint) {
+                  actions.add(cleanPoint);
+                }
+              });
             }
           }
         });
+        
+        console.log('[HIRA] Extracted root causes:', Array.from(rootCauses));
+        console.log('[HIRA] Extracted actions:', Array.from(actions));
         
         // Format as bullet points
         const formattedRootCauses = Array.from(rootCauses).length > 0 
@@ -303,6 +330,8 @@ class HiraRecommendationService {
           : '- Control Preventive: Implementasi prosedur keselamatan yang ketat';
         
         console.log('[HIRA] Successfully formatted HIRA recommendations');
+        console.log('[HIRA] Final root causes:', formattedRootCauses);
+        console.log('[HIRA] Final actions:', formattedActions);
         
         return {
           rootCauses: formattedRootCauses,
