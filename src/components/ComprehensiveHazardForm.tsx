@@ -162,28 +162,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
   }, [uploadedFiles]);
 
   const handleFormSubmit = async (data: HazardFormData) => {
-    // Check for exact duplicates first
-    const isDuplicate = await similarityDetectionService.checkExactDuplicate({
-      location: data.location,
-      non_compliance: data.nonCompliance,
-      sub_non_compliance: data.subNonCompliance,
-      finding_description: data.findingDescription,
-      latitude: data.latitude,
-      longitude: data.longitude,
-    });
-
-    if (isDuplicate) {
-      toast({
-        title: 'Hazard Duplikat Terdeteksi',
-        description: 'Hazard yang sama persis telah dilaporkan dalam 7 hari terakhir dan akan otomatis ditandai sebagai duplikat.',
-        variant: 'destructive',
-      });
-      // Auto-submit with duplicate status
-      await submitForm(data, true);
-      return;
-    }
-
-    // Check for similar hazards
+    // Check for similar hazards before submission
     const similarHazards = await similarityDetectionService.checkSimilarHazards({
       location: data.location,
       non_compliance: data.nonCompliance,
@@ -198,7 +177,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
       setPendingSubmissionData(data);
       setSimilarityDialogOpen(true);
     } else {
-      await submitForm(data);
+      await submitForm(data, false);
     }
   };
 
@@ -232,7 +211,7 @@ Deskripsi Temuan: ${data.findingDescription}
 
   const handleContinueSubmission = async () => {
     if (pendingSubmissionData) {
-      await submitForm(pendingSubmissionData);
+      await submitForm(pendingSubmissionData, false);
       setSimilarityDialogOpen(false);
       setPendingSubmissionData(null);
     }

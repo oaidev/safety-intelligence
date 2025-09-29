@@ -14,7 +14,10 @@ export interface GenerationResponse {
       parts: Array<{
         text: string;
       }>;
+      role?: string;
+      text?: string;
     };
+    finishReason?: string;
   }>;
 }
 
@@ -134,7 +137,22 @@ class MultiRagService {
       throw new Error('No response generated from API');
     }
 
-    return data.candidates[0]?.content.parts[0]?.text || 'No response generated';
+    // Handle different response structures
+    const candidate = data.candidates[0];
+    
+    // Check if the response has the expected structure
+    if (candidate?.content?.parts?.[0]?.text) {
+      return candidate.content.parts[0].text;
+    }
+    
+    // Handle alternative structure with role and finishReason
+    if (candidate?.content?.role === 'model' && candidate?.finishReason) {
+      console.warn('[MultiRAG] API response truncated due to MAX_TOKENS limit');
+      return candidate.content.text || 'Response was truncated due to length limits';
+    }
+    
+    console.error('[MultiRAG] Unexpected response structure:', data);
+    return 'No response generated';
   }
 
   // Calculate cosine similarity between two vectors

@@ -134,34 +134,6 @@ class SimilarityDetectionService {
   }
 
   /**
-   * Check for exact duplicate hazards in the last 7 days
-   */
-  async checkExactDuplicate(submissionData: HazardSubmissionData): Promise<boolean> {
-    try {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const { data, error } = await supabase
-        .from('hazard_reports')
-        .select('id')
-        .eq('location', submissionData.location)
-        .eq('non_compliance', submissionData.non_compliance)
-        .eq('sub_non_compliance', submissionData.sub_non_compliance)
-        .gte('created_at', sevenDaysAgo)
-        .limit(1);
-
-      if (error) {
-        console.error('Error checking for exact duplicates:', error);
-        return false;
-      }
-
-      return data && data.length > 0;
-    } catch (error) {
-      console.error('Error in exact duplicate check:', error);
-      return false;
-    }
-  }
-
-  /**
    * Calculate distance between two coordinates using Haversine formula
    */
   private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

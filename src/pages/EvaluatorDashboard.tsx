@@ -529,6 +529,8 @@ export default function EvaluatorDashboard() {
           </CardContent>
         </Card>
 
+        {/* Cluster Analysis Section */}
+        <ClusterAnalysisDashboard />
       </div>
     </div>
   );
