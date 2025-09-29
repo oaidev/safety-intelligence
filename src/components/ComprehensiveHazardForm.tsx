@@ -22,15 +22,16 @@ const hazardFormSchema = z.object({
   observationTool: z.string().min(1, 'Tools Pengamatan wajib dipilih'),
   site: z.string().min(1, 'Site wajib dipilih'),
   location: z.string().min(1, 'Lokasi wajib dipilih'),
-  detailLocation: z.string().optional(),
+  detailLocation: z.string().min(1, 'Detail Lokasi wajib dipilih'),
+  locationDescription: z.string().min(1, 'Keterangan Lokasi wajib diisi'),
   areaPjaBC: z.string().min(1, 'Area PJA BC wajib dipilih'),
-  areaPjaMitra: z.string().optional(),
+  areaPjaMitra: z.string().min(1, 'Area PJA Mitra wajib dipilih'),
   nonCompliance: z.string().min(1, 'Ketidaksesuaian wajib dipilih'),
   subNonCompliance: z.string().min(1, 'Sub Ketidaksesuaian wajib dipilih'),
   quickAction: z.string().min(1, 'Quick Action wajib dipilih'),
   findingDescription: z.string().min(10, 'Deskripsi Temuan minimal 10 karakter'),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
+  latitude: z.string().min(1, 'Latitude wajib diisi'),
+  longitude: z.string().min(1, 'Longitude wajib diisi'),
 });
 
 type HazardFormData = z.infer<typeof hazardFormSchema>;
@@ -127,6 +128,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
       site: '',
       location: '',
       detailLocation: '',
+      locationDescription: '',
       areaPjaBC: '',
       areaPjaMitra: '',
       nonCompliance: '',
@@ -168,6 +170,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
     const similarHazards = await similarityDetectionService.checkSimilarHazards({
       location: data.location,
       detail_location: data.detailLocation,
+      location_description: data.locationDescription,
       non_compliance: data.nonCompliance,
       sub_non_compliance: data.subNonCompliance,
       finding_description: data.findingDescription,
@@ -202,6 +205,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
 Ketidaksesuaian: ${data.nonCompliance}
 Sub Ketidaksesuaian: ${data.subNonCompliance}
 Deskripsi Temuan: ${data.findingDescription}
+Keterangan Lokasi: ${data.locationDescription}
     `.trim();
 
     const formDataWithLocationAndStatus = { 
@@ -420,9 +424,28 @@ Deskripsi Temuan: ${data.findingDescription}
                       <FormMessage />
                     </FormItem>
                   )}
-                />
-                
-                {/* Location Pinpoint Section */}
+                 />
+                 
+                 {/* Location Description Field */}
+                 <FormField
+                   control={form.control}
+                   name="locationDescription"
+                   render={({ field }) => (
+                     <FormItem>
+                       <FormLabel>Keterangan Lokasi</FormLabel>
+                       <FormControl>
+                         <Textarea 
+                           placeholder="Masukkan keterangan lokasi yang lebih spesifik"
+                           className="min-h-[80px]"
+                           {...field}
+                         />
+                       </FormControl>
+                       <FormMessage />
+                     </FormItem>
+                   )}
+                 />
+                 
+                 {/* Location Pinpoint Section */}
                 <div className="border rounded-lg p-4 bg-muted/10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">

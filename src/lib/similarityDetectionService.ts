@@ -5,6 +5,8 @@ export interface SimilarHazardData {
   tracking_id: string;
   reporter_name: string;
   location: string;
+  detail_location?: string;
+  location_description?: string;
   non_compliance: string;
   sub_non_compliance: string;
   finding_description: string;
@@ -19,6 +21,7 @@ export interface SimilarHazardData {
 export interface HazardSubmissionData {
   location: string;
   detail_location?: string;
+  location_description?: string;
   non_compliance: string;
   sub_non_compliance: string;
   finding_description: string;
@@ -53,6 +56,7 @@ class SimilarityDetectionService {
           reporter_name,
           location,
           detail_location,
+          location_description,
           non_compliance,
           sub_non_compliance,
           finding_description,
@@ -141,7 +145,21 @@ class SimilarityDetectionService {
           console.log(`❌ Detail location mismatch: "${hazard.detail_location}" vs "${submissionData.detail_location}"`);
         }
 
-        // 4. Non-compliance exact match - Weight: 0.15
+        // 4. Location description semantic similarity - Weight: 0.10 (NEW)
+        let locationDescriptionScore = 0;
+        if (submissionData.location_description && hazard.location_description) {
+          const descSimilarity = this.calculateTextSimilarity(
+            this.normalizeText(submissionData.location_description),
+            this.normalizeText(hazard.location_description)
+          );
+          locationDescriptionScore = descSimilarity * 0.10;
+          similarityScore += locationDescriptionScore;
+          console.log(`✅ Location description similarity: +${locationDescriptionScore.toFixed(3)} (${(descSimilarity * 100).toFixed(1)}% match)`);
+        } else {
+          console.log('❌ No location description for comparison');
+        }
+
+        // 5. Non-compliance exact match - Weight: 0.15
         let nonComplianceScore = 0;
         if (this.normalizeText(hazard.non_compliance) === this.normalizeText(submissionData.non_compliance)) {
           nonComplianceScore = 0.15;

@@ -46,7 +46,6 @@ export function HazardScoring({ analysis, onImproveReport, onExportReport }: Haz
       case 'consistency': return <Shuffle className="h-5 w-5" />;
       case 'completeness': return <FileText className="h-5 w-5" />;
       case 'image_relevance': return <Image className="h-5 w-5" />;
-      case 'actionability': return <Target className="h-5 w-5" />;
       default: return <FileText className="h-5 w-5" />;
     }
   };
@@ -56,7 +55,6 @@ export function HazardScoring({ analysis, onImproveReport, onExportReport }: Haz
       case 'consistency': return 'Konsistensi Antar Field';
       case 'completeness': return 'Kelengkapan Deskripsi';
       case 'image_relevance': return 'Kesesuaian Gambar';
-      case 'actionability': return 'Dapat Ditindaklanjuti';
       default: return category;
     }
   };
@@ -116,7 +114,7 @@ export function HazardScoring({ analysis, onImproveReport, onExportReport }: Haz
               {scoringService.getScoreGrade(analysis.scores.overall)}
             </Badge>
             <p className="text-sm text-muted-foreground">
-              Skor keseluruhan berdasarkan 4 aspek penilaian
+              Skor keseluruhan berdasarkan 3 aspek penilaian
             </p>
           </div>
           
@@ -124,7 +122,7 @@ export function HazardScoring({ analysis, onImproveReport, onExportReport }: Haz
       </Card>
 
       {/* Detailed Score Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(analysis.detailed_analysis).map(([category, details]) => (
           <Card key={category} className="shadow-card">
             <Collapsible 
@@ -270,28 +268,6 @@ export function HazardScoring({ analysis, onImproveReport, onExportReport }: Haz
           </Card>
         ))}
       </div>
-
-      {/* Recommendations Panel */}
-      <Card className="shadow-card">
-        <CardHeader>
-          <CardTitle>Rekomendasi Perbaikan</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {analysis.recommendations.map((recommendation, index) => (
-            <div 
-              key={index} 
-              className={`p-3 rounded-lg border ${getPriorityColor(recommendation)}`}
-            >
-              <div className="flex items-start gap-2">
-                {recommendation.includes('HIGH') && <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
-                {recommendation.includes('MEDIUM') && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
-                {recommendation.includes('LOW') && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
-                <span className="text-sm font-medium">{recommendation}</span>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 }

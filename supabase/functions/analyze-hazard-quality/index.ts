@@ -12,6 +12,7 @@ interface HazardFormData {
   sub_ketidaksesuaian: string;
   tools_pengamatan: string;
   lokasi_detail: string;
+  location_description?: string;
   quick_action: string;
   image_base64?: string;
 }
@@ -31,7 +32,7 @@ serve(async (req) => {
 
     // Build the analysis prompt
     const analysisPrompt = `
-Analisis kualitas laporan hazard berikut menggunakan 4 aspek scoring:
+Analisis kualitas laporan hazard berikut menggunakan 3 aspek scoring:
 
 FORM DATA:
 Deskripsi Temuan: "${formData.deskripsi_temuan}"
@@ -39,44 +40,40 @@ Ketidaksesuaian: "${formData.ketidaksesuaian}"
 Sub Ketidaksesuaian: "${formData.sub_ketidaksesuaian}"
 Tools Pengamatan: "${formData.tools_pengamatan}"
 Lokasi: "${formData.lokasi_detail}"
+Keterangan Lokasi: "${formData.location_description || 'Tidak ada'}"
 Quick Action: "${formData.quick_action}"
 
 Berikan scoring 1-100 untuk setiap aspek berikut:
 
-1. CONSISTENCY SCORE (Konsistensi Antar Field)
+1. CONSISTENCY SCORE (Konsistensi Antar Field) - 35% weight
 Apakah Deskripsi Temuan sesuai dengan Ketidaksesuaian yang dipilih?
 Apakah Sub Ketidaksesuaian relevan dengan Ketidaksesuaian utama?
 Apakah Quick Action sesuai dengan severity temuan?
 
-2. COMPLETENESS SCORE (Kelengkapan Deskripsi)
-Evaluasi kelengkapan berdasarkan 5W1H:
+2. COMPLETENESS SCORE (Kelengkapan Deskripsi) - 40% weight
+Evaluasi kelengkapan berdasarkan 5W1H termasuk keterangan lokasi:
 WHO: Siapa yang terlibat? (pekerja, operator, pengawas)
 WHAT: Apa yang terjadi? (aktivitas, pelanggaran spesifik)
-WHERE: Dimana kejadian? (lokasi spesifik, area kerja)
+WHERE: Dimana kejadian? (lokasi spesifik, area kerja, keterangan lokasi detail)
 WHEN: Kapan terjadi? (waktu, shift, kondisi)
 WHY: Mengapa terjadi? (root cause, kondisi pemicu)
 HOW: Bagaimana terjadi? (sequence of events, mekanisme)
 
-3. IMAGE RELEVANCE SCORE (Kesesuaian Gambar)
-Apakah image menunjukkan hazard yang dideskripsikan?
-Apakah image mendukung claims dalam Deskripsi Temuan?
-Kualitas image (clarity, angle, detail visibility)
-Apakah image menunjukkan konteks lokasi yang sesuai?
-
-4. ACTIONABILITY SCORE (Dapat Ditindaklanjuti)
-Apakah deskripsi cukup spesifik untuk investigasi?
-Apakah ada informasi yang memungkinkan corrective action?
-Apakah Quick Action sesuai dengan tingkat risiko?
-Apakah informasi cukup untuk prevention measures?
+3. IMAGE RELEVANCE SCORE (Kesesuaian Gambar) - 25% weight
+JIKA TIDAK ADA IMAGE: return score 0
+JIKA ADA IMAGE:
+- Apakah image menunjukkan hazard yang dideskripsikan?
+- Apakah image mendukung claims dalam Deskripsi Temuan?
+- Kualitas image (clarity, angle, detail visibility)
+- Apakah image menunjukkan konteks lokasi yang sesuai?
 
 WAJIB: Berikan response dalam format JSON yang valid berikut:
 {
   "scores": {
     "consistency": 85,
     "completeness": 70,
-    "image_relevance": 90,
-    "actionability": 75,
-    "overall": 80
+    "image_relevance": 0,
+    "overall": 62
   },
   "detailed_analysis": {
     "consistency": {
@@ -87,17 +84,12 @@ WAJIB: Berikan response dalam format JSON yang valid berikut:
     "completeness": {
       "score": 70,
       "missing_elements": ["Waktu kejadian tidak disebutkan"],
-      "strong_points": ["Lokasi spesifik jelas"]
+      "strong_points": ["Lokasi spesifik jelas", "Keterangan lokasi detail"]
     },
     "image_relevance": {
-      "score": 90,
-      "findings": ["Image clearly shows the hazard"],
-      "issues": ["Image angle could be better"]
-    },
-    "actionability": {
-      "score": 75,
-      "strengths": ["Specific violation identified"],
-      "improvements": ["Need more context about work conditions"]
+      "score": 0,
+      "findings": [],
+      "issues": ["Tidak ada gambar yang disertakan"]
     }
   },
   "recommendations": [

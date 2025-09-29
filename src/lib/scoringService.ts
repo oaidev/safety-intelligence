@@ -4,7 +4,6 @@ export interface ScoreData {
   consistency: number;
   completeness: number;
   image_relevance: number;
-  actionability: number;
   overall: number;
 }
 
@@ -24,11 +23,6 @@ export interface DetailedAnalysis {
     findings: string[];
     issues: string[];
   };
-  actionability: {
-    score: number;
-    strengths: string[];
-    improvements: string[];
-  };
 }
 
 export interface AnalysisResult {
@@ -47,6 +41,7 @@ export interface HazardFormData {
   sub_ketidaksesuaian: string;
   tools_pengamatan: string;
   lokasi_detail: string;
+  location_description?: string;
   quick_action: string;
   image_base64?: string;
 }
