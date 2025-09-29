@@ -104,30 +104,10 @@ export class HazardReportService {
 
     console.log('[HazardReportService] Report saved successfully:', savedReport);
 
-    // Skip similarity analysis if already marked as duplicate
-    if (formData.isDuplicate) {
-      return savedReport;
-    }
-
-    // Find similar reports and create clusters if needed
-    try {
-      const similarReports = await similarityService.findSimilarReports({
-        id: savedReport.id,
-        tracking_id: savedReport.tracking_id,
-        reporter_name: formData.reporterName,
-        location: formData.location,
-        non_compliance: formData.nonCompliance,
-        sub_non_compliance: formData.subNonCompliance,
-        finding_description: formData.findingDescription,
-        status: savedReport.status,
-        created_at: savedReport.created_at,
-      });
-
-      if (similarReports.length > 0) {
-        console.log(`[HazardReportService] Found ${similarReports.length} similar reports`);
-        
-        // Create a cluster including the current report
-        const allReports = [...similarReports, { 
+    // Post-save similarity clustering (for analytics only, not for pre-submission detection)
+    if (!formData.isDuplicate) {
+      try {
+        const similarReports = await similarityService.findSimilarReports({
           id: savedReport.id,
           tracking_id: savedReport.tracking_id,
           reporter_name: formData.reporterName,
@@ -137,19 +117,32 @@ export class HazardReportService {
           finding_description: formData.findingDescription,
           status: savedReport.status,
           created_at: savedReport.created_at,
-        }];
-        
-        await similarityService.createSimilarityCluster(allReports);
-      }
+        });
 
-      return {
-        ...savedReport,
-        similar_reports: similarReports
-      };
-    } catch (similarityError) {
-      console.warn('[HazardReportService] Similarity analysis failed, but report was saved:', similarityError);
-      return savedReport;
+        if (similarReports.length > 0) {
+          console.log(`[HazardReportService] Found ${similarReports.length} similar reports for clustering`);
+          
+          // Create a cluster including the current report
+          const allReports = [...similarReports, { 
+            id: savedReport.id,
+            tracking_id: savedReport.tracking_id,
+            reporter_name: formData.reporterName,
+            location: formData.location,
+            non_compliance: formData.nonCompliance,
+            sub_non_compliance: formData.subNonCompliance,
+            finding_description: formData.findingDescription,
+            status: savedReport.status,
+            created_at: savedReport.created_at,
+          }];
+          
+          await similarityService.createSimilarityCluster(allReports);
+        }
+      } catch (similarityError) {
+        console.warn('[HazardReportService] Post-save similarity clustering failed:', similarityError);
+      }
     }
+
+    return savedReport;
   }
 
   /**

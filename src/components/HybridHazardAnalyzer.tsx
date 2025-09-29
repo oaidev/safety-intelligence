@@ -67,9 +67,12 @@ export function HybridHazardAnalyzer() {
   }, [toast]);
 
   const handleFormSubmit = async (data: { description: string; formData: any }) => {
+    // Store form data but don't save to database yet - let ComprehensiveHazardForm handle similarity check first
     setHazardDescription(data.description);
     setFormData(data.formData);
-    
+  };
+
+  const handleActualSubmission = async (data: { description: string; formData: any }) => {
     if (!data.description.trim()) {
       toast({
         title: 'Error',
@@ -87,7 +90,7 @@ export function HybridHazardAnalyzer() {
       // Import hazard report service
       const { hazardReportService } = await import('@/lib/hazardReportService');
       
-      // Save hazard report to database first
+      // Save hazard report to database
       const savedReport = await hazardReportService.saveHazardReport({
         reporterName: data.formData.reporterName || 'Anonymous',
         reporterPosition: data.formData.reporterPosition,
@@ -103,13 +106,15 @@ export function HybridHazardAnalyzer() {
         subNonCompliance: data.formData.subNonCompliance || 'Unknown',
         quickAction: data.formData.quickAction || 'Unknown',
         findingDescription: data.description,
-        uploadedImage: data.formData.uploadedImage
+        uploadedImage: data.formData.uploadedImage,
+        latitude: data.formData.latitude,
+        longitude: data.formData.longitude
       });
 
       // Show success message with tracking ID
       toast({
         title: 'Laporan Berhasil Disimpan',
-        description: `ID Tracking: ${savedReport.tracking_id}${savedReport.similar_reports?.length ? ` | ${savedReport.similar_reports.length} laporan serupa ditemukan` : ''}`,
+        description: `ID Tracking: ${savedReport.tracking_id}`,
         duration: 5000,
       });
 
@@ -331,7 +336,7 @@ export function HybridHazardAnalyzer() {
         <div className="space-y-8">
           {/* Comprehensive Form */}
           <ComprehensiveHazardForm 
-            onSubmit={handleFormSubmit}
+            onSubmit={handleActualSubmission}
             isSubmitting={isAnalyzing}
           />
 

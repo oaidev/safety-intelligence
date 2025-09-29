@@ -162,6 +162,8 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
   }, [uploadedFiles]);
 
   const handleFormSubmit = async (data: HazardFormData) => {
+    console.log('[ComprehensiveHazardForm] Starting similarity check for data:', data);
+    
     // Check for similar hazards before submission
     const similarHazards = await similarityDetectionService.checkSimilarHazards({
       location: data.location,
@@ -172,11 +174,15 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
       longitude: data.longitude,
     });
 
+    console.log('[ComprehensiveHazardForm] Found similar hazards:', similarHazards);
+
     if (similarHazards.length > 0) {
+      console.log('[ComprehensiveHazardForm] Opening similarity dialog with', similarHazards.length, 'similar hazards');
       setSimilarHazards(similarHazards);
       setPendingSubmissionData(data);
       setSimilarityDialogOpen(true);
     } else {
+      console.log('[ComprehensiveHazardForm] No similar hazards found, proceeding with submission');
       await submitForm(data, false);
     }
   };
