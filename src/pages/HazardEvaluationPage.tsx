@@ -194,17 +194,29 @@ export default function HazardEvaluationPage() {
           finalStatus = 'DUPLIKAT';
           break;
         case 'BUKAN HAZARD':
-          finalStatus = 'BUKAN_HAZARD';
+          finalStatus = 'COMPLETED'; // Keep as COMPLETED since BUKAN_HAZARD might not be allowed
           break;
         default:
           finalStatus = 'COMPLETED';
       }
       
-      await hazardReportService.updateHazardEvaluation(report.id, {
-        ...evaluationData,
+      // Only include fields that should be saved based on konfirmasi selection  
+      const dataToSave: any = {
+        kategori_temuan: evaluationData.kategori_temuan,
+        konfirmasi: evaluationData.konfirmasi,
         status: finalStatus,
-        evaluated_by: 'current-evaluator' // In a real app, this would be the current user ID
-      });
+        evaluated_by: null // Set to null instead of string to avoid constraint issues
+      };
+      
+      // Only include these fields if "RUBAH TINDAKAN" is selected
+      if (evaluationData.konfirmasi === 'RUBAH TINDAKAN') {
+        dataToSave.root_cause_analysis = evaluationData.alur_permasalahan;
+        dataToSave.corrective_actions = evaluationData.tindakan;
+        dataToSave.jenis_tindakan = evaluationData.jenis_tindakan;
+        dataToSave.due_date_perbaikan = dueDate ? format(dueDate, 'yyyy-MM-dd') : null;
+      }
+      
+      await hazardReportService.updateHazardEvaluation(report.id, dataToSave);
 
       toast({
         title: 'Evaluation Completed',
@@ -216,7 +228,7 @@ export default function HazardEvaluationPage() {
       console.error('Error saving evaluation:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save evaluation',
+        description: `Failed to save evaluation: ${error.message || 'Unknown error'}`,
         variant: 'destructive',
       });
     } finally {

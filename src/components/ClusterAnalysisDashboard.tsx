@@ -30,9 +30,18 @@ interface ClusterStats {
   topCategories: Array<{ category: string; count: number }>;
 }
 
+interface TimingAnalytics {
+  avg_review_to_close_days: number;
+  avg_submission_interval_hours: number;
+}
+
 export function ClusterAnalysisDashboard() {
   const [painPoints, setPainPoints] = useState<SimilarityCluster[]>([]);
   const [clusterStats, setClusterStats] = useState<ClusterStats | null>(null);
+  const [timingAnalytics, setTimingAnalytics] = useState<TimingAnalytics>({
+    avg_review_to_close_days: 0,
+    avg_submission_interval_hours: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -42,9 +51,14 @@ export function ClusterAnalysisDashboard() {
   const loadClusterData = async () => {
     setIsLoading(true);
     try {
-      // Load pain points
-      const points = await similarityService.getPainPoints();
+      // Load pain points and timing analytics
+      const [points, timingData] = await Promise.all([
+        similarityService.getPainPoints(),
+        hazardReportService.getTimingAnalytics()
+      ]);
+      
       setPainPoints(points);
+      setTimingAnalytics(timingData);
 
       // Calculate cluster statistics
       if (points.length > 0) {
@@ -169,12 +183,68 @@ export function ClusterAnalysisDashboard() {
         </Card>
       </div>
 
-      <Tabs defaultValue="clusters" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="timing" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="timing">Waktu Review</TabsTrigger>
+          <TabsTrigger value="interval">Interval Submission</TabsTrigger>
           <TabsTrigger value="clusters">Pain Points</TabsTrigger>
           <TabsTrigger value="locations">Top Locations</TabsTrigger>
           <TabsTrigger value="categories">Top Categories</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="timing" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Waktu Review ke Closing
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="text-center p-6 bg-muted/50 rounded-lg">
+                  <div className="text-3xl font-bold text-primary">
+                    {timingAnalytics.avg_review_to_close_days.toFixed(1)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Hari rata-rata dari review ke closing</div>
+                </div>
+                <div className="text-center p-6 bg-muted/50 rounded-lg">
+                  <div className="text-3xl font-bold text-primary">
+                    {timingAnalytics.avg_review_to_close_days <= 7 ? 'Baik' : timingAnalytics.avg_review_to_close_days <= 14 ? 'Sedang' : 'Perlu Perbaikan'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Status performa review</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="interval" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Interval Submission
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="text-center p-6 bg-muted/50 rounded-lg">
+                  <div className="text-3xl font-bold text-primary">
+                    {timingAnalytics.avg_submission_interval_hours.toFixed(1)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Jam rata-rata antar submission</div>
+                </div>
+                <div className="text-center p-6 bg-muted/50 rounded-lg">
+                  <div className="text-3xl font-bold text-primary">
+                    {timingAnalytics.avg_submission_interval_hours <= 24 ? 'Tinggi' : timingAnalytics.avg_submission_interval_hours <= 72 ? 'Normal' : 'Rendah'}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Frekuensi pelaporan</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="clusters" className="space-y-4">
           <Card>

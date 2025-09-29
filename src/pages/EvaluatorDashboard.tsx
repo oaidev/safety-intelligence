@@ -63,11 +63,6 @@ export default function EvaluatorDashboard() {
     completed: 0,
     pain_points: 0,
   });
-  const [timingAnalytics, setTimingAnalytics] = useState<TimingAnalytics>({
-    avg_review_to_close_days: 0,
-    avg_submission_interval_hours: 0,
-  });
-  const [activeAnalysisTab, setActiveAnalysisTab] = useState('timing');
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     search: '',
@@ -88,15 +83,13 @@ export default function EvaluatorDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [reportsData, statsData, timingData] = await Promise.all([
+      const [reportsData, statsData] = await Promise.all([
         hazardReportService.getPendingReports(filters),
-        hazardReportService.getDashboardStats(),
-        hazardReportService.getTimingAnalytics()
+        hazardReportService.getDashboardStats()
       ]);
       
       setReports(reportsData);
       setStats(statsData);
-      setTimingAnalytics(timingData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       toast({
@@ -270,82 +263,8 @@ export default function EvaluatorDashboard() {
           />
         </div>
 
-        {/* Analysis Tabs */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Analisis Dashboard</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 mb-6">
-              <Button
-                variant={activeAnalysisTab === 'timing' ? 'default' : 'outline'}
-                onClick={() => setActiveAnalysisTab('timing')}
-                size="sm"
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Waktu Review
-              </Button>
-              <Button
-                variant={activeAnalysisTab === 'interval' ? 'default' : 'outline'}
-                onClick={() => setActiveAnalysisTab('interval')}
-                size="sm"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Interval Submission
-              </Button>
-              <Button
-                variant={activeAnalysisTab === 'clusters' ? 'default' : 'outline'}
-                onClick={() => setActiveAnalysisTab('clusters')}
-                size="sm"
-              >
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Pain Points
-              </Button>
-            </div>
-
-            {activeAnalysisTab === 'timing' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="text-center p-6 bg-muted/50 rounded-lg">
-                    <div className="text-3xl font-bold text-primary">
-                      {timingAnalytics.avg_review_to_close_days.toFixed(1)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Hari rata-rata dari review ke closing</div>
-                  </div>
-                  <div className="text-center p-6 bg-muted/50 rounded-lg">
-                    <div className="text-3xl font-bold text-primary">
-                      {timingAnalytics.avg_review_to_close_days <= 7 ? 'Baik' : timingAnalytics.avg_review_to_close_days <= 14 ? 'Sedang' : 'Perlu Perbaikan'}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Status performa review</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeAnalysisTab === 'interval' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="text-center p-6 bg-muted/50 rounded-lg">
-                    <div className="text-3xl font-bold text-primary">
-                      {timingAnalytics.avg_submission_interval_hours.toFixed(1)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Jam rata-rata antar submission</div>
-                  </div>
-                  <div className="text-center p-6 bg-muted/50 rounded-lg">
-                    <div className="text-3xl font-bold text-primary">
-                      {timingAnalytics.avg_submission_interval_hours <= 24 ? 'Tinggi' : timingAnalytics.avg_submission_interval_hours <= 72 ? 'Normal' : 'Rendah'}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Frekuensi pelaporan</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeAnalysisTab === 'clusters' && (
-              <ClusterAnalysisDashboard />
-            )}
-          </CardContent>
-        </Card>
+        {/* Analysis Dashboard */}
+        <ClusterAnalysisDashboard />
 
         {/* Filters */}
         <Card>
