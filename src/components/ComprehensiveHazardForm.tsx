@@ -9,8 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { AlertTriangle, Upload, RotateCcw, Send, Building2, X, Eye } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { AlertTriangle, Upload, RotateCcw, Send, Building2, X, Eye, MapPin, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { SimilarityCheckDialog } from '@/components/SimilarityCheckDialog';
+import { similarityDetectionService, type SimilarHazardData } from '@/lib/similarityDetectionService';
 
 // Form schema
 const hazardFormSchema = z.object({
@@ -26,6 +29,8 @@ const hazardFormSchema = z.object({
   subNonCompliance: z.string().min(1, 'Sub Ketidaksesuaian wajib dipilih'),
   quickAction: z.string().min(1, 'Quick Action wajib dipilih'),
   findingDescription: z.string().min(10, 'Deskripsi Temuan minimal 10 karakter'),
+  latitude: z.string().optional(),
+  longitude: z.string().optional(),
 });
 
 type HazardFormData = z.infer<typeof hazardFormSchema>;
@@ -109,6 +114,9 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
   const { toast } = useToast();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [similarityDialogOpen, setSimilarityDialogOpen] = useState(false);
+  const [similarHazards, setSimilarHazards] = useState<SimilarHazardData[]>([]);
+  const [pendingSubmissionData, setPendingSubmissionData] = useState<any>(null);
 
   const form = useForm<HazardFormData>({
     resolver: zodResolver(hazardFormSchema),
@@ -125,6 +133,8 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
       subNonCompliance: '',
       quickAction: '',
       findingDescription: '',
+      latitude: '2.0194521',  // Default to Berau Coal Binungan
+      longitude: '117.6183817',
     },
   });
 
@@ -152,6 +162,47 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
   }, [uploadedFiles]);
 
   const handleFormSubmit = async (data: HazardFormData) => {
+    // Check for exact duplicates first
+    const isDuplicate = await similarityDetectionService.checkExactDuplicate({
+      location: data.location,
+      non_compliance: data.nonCompliance,
+      sub_non_compliance: data.subNonCompliance,
+      finding_description: data.findingDescription,
+      latitude: data.latitude,
+      longitude: data.longitude,
+    });
+
+    if (isDuplicate) {
+      toast({
+        title: 'Hazard Duplikat Terdeteksi',
+        description: 'Hazard yang sama persis telah dilaporkan dalam 7 hari terakhir dan akan otomatis ditandai sebagai duplikat.',
+        variant: 'destructive',
+      });
+      // Auto-submit with duplicate status
+      await submitForm(data, true);
+      return;
+    }
+
+    // Check for similar hazards
+    const similarHazards = await similarityDetectionService.checkSimilarHazards({
+      location: data.location,
+      non_compliance: data.nonCompliance,
+      sub_non_compliance: data.subNonCompliance,
+      finding_description: data.findingDescription,
+      latitude: data.latitude,
+      longitude: data.longitude,
+    });
+
+    if (similarHazards.length > 0) {
+      setSimilarHazards(similarHazards);
+      setPendingSubmissionData(data);
+      setSimilarityDialogOpen(true);
+    } else {
+      await submitForm(data);
+    }
+  };
+
+  const submitForm = async (data: HazardFormData, markAsDuplicate = false) => {
     // Convert uploaded files to base64
     let uploadedImage = undefined;
     if (uploadedFiles.length > 0) {
@@ -167,10 +218,29 @@ Sub Ketidaksesuaian: ${data.subNonCompliance}
 Deskripsi Temuan: ${data.findingDescription}
     `.trim();
 
+    const formDataWithLocationAndStatus = { 
+      ...data, 
+      uploadedImage,
+      isDuplicate: markAsDuplicate
+    };
+
     onSubmit({
       description: combinedDescription,
-      formData: { ...data, uploadedImage }
+      formData: formDataWithLocationAndStatus
     });
+  };
+
+  const handleContinueSubmission = async () => {
+    if (pendingSubmissionData) {
+      await submitForm(pendingSubmissionData);
+      setSimilarityDialogOpen(false);
+      setPendingSubmissionData(null);
+    }
+  };
+
+  const handleEditForm = () => {
+    setSimilarityDialogOpen(false);
+    setPendingSubmissionData(null);
   };
 
   const convertFileToBase64 = (file: File): Promise<string> => {
@@ -365,6 +435,64 @@ Deskripsi Temuan: ${data.findingDescription}
                     </FormItem>
                   )}
                 />
+                
+                {/* Location Pinpoint Section */}
+                <div className="border rounded-lg p-4 bg-muted/10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-medium">Pin Point Lokasi</Label>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`https://www.google.com/maps/place/Berau+Coal+Binungan/@${form.getValues('latitude')},${form.getValues('longitude')},17z`, '_blank')}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Buka Maps
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="latitude"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Latitude</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="Contoh: 2.0194521" 
+                              className="text-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="longitude"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Longitude</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="Contoh: 117.6183817" 
+                              className="text-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Default: Berau Coal Binungan. Anda dapat mencari koordinat di Google Maps dan memasukkannya di sini.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -634,6 +762,15 @@ Deskripsi Temuan: ${data.findingDescription}
           </div>
         </form>
       </Form>
+      
+      {/* Similarity Check Dialog */}
+      <SimilarityCheckDialog
+        open={similarityDialogOpen}
+        onOpenChange={setSimilarityDialogOpen}
+        similarHazards={similarHazards}
+        onContinueSubmission={handleContinueSubmission}
+        onEditForm={handleEditForm}
+      />
     </div>
   );
 }

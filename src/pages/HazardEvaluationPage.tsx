@@ -180,9 +180,29 @@ export default function HazardEvaluationPage() {
     
     try {
       setSaving(true);
+      
+      // Determine the final status based on konfirmasi
+      let finalStatus = 'COMPLETED';
+      switch (evaluationData.konfirmasi) {
+        case 'RUBAH TINDAKAN':
+          finalStatus = 'IN_PROGRESS';
+          break;
+        case 'TUTUP LAPORAN':
+          finalStatus = 'COMPLETED';
+          break;
+        case 'DUPLIKAT':
+          finalStatus = 'DUPLIKAT';
+          break;
+        case 'BUKAN HAZARD':
+          finalStatus = 'BUKAN_HAZARD';
+          break;
+        default:
+          finalStatus = 'COMPLETED';
+      }
+      
       await hazardReportService.updateHazardEvaluation(report.id, {
         ...evaluationData,
-        status: 'COMPLETED',
+        status: finalStatus,
         evaluated_by: 'current-evaluator' // In a real app, this would be the current user ID
       });
 
@@ -215,9 +235,10 @@ export default function HazardEvaluationPage() {
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'PENDING_REVIEW': return 'destructive';
-      case 'UNDER_EVALUATION': return 'secondary';
       case 'IN_PROGRESS': return 'default';
       case 'COMPLETED': return 'default';
+      case 'DUPLIKAT': return 'secondary';
+      case 'BUKAN_HAZARD': return 'outline';
       default: return 'outline';
     }
   };
@@ -225,9 +246,10 @@ export default function HazardEvaluationPage() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'PENDING_REVIEW': return 'Menunggu Review';
-      case 'UNDER_EVALUATION': return 'Sedang Evaluasi';
       case 'IN_PROGRESS': return 'Dalam Proses';
       case 'COMPLETED': return 'Selesai';
+      case 'DUPLIKAT': return 'Duplikat';
+      case 'BUKAN_HAZARD': return 'Bukan Hazard';
       default: return status;
     }
   };

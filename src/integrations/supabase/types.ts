@@ -130,8 +130,10 @@ export type Database = {
           jenis_tindakan: string | null
           kategori_temuan: string | null
           konfirmasi: string | null
+          latitude: number | null
           location: string
           location_description: string | null
+          longitude: number | null
           non_compliance: string
           observation_tool: string | null
           pja_mitra_kerja: string | null
@@ -167,8 +169,10 @@ export type Database = {
           jenis_tindakan?: string | null
           kategori_temuan?: string | null
           konfirmasi?: string | null
+          latitude?: number | null
           location: string
           location_description?: string | null
+          longitude?: number | null
           non_compliance: string
           observation_tool?: string | null
           pja_mitra_kerja?: string | null
@@ -204,8 +208,10 @@ export type Database = {
           jenis_tindakan?: string | null
           kategori_temuan?: string | null
           konfirmasi?: string | null
+          latitude?: number | null
           location?: string
           location_description?: string | null
+          longitude?: number | null
           non_compliance?: string
           observation_tool?: string | null
           pja_mitra_kerja?: string | null
@@ -335,6 +341,10 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
+      }
+      calculate_distance_km: {
+        Args: { lat1: number; lat2: number; lon1: number; lon2: number }
+        Returns: number
       }
       halfvec_avg: {
         Args: { "": number[] }

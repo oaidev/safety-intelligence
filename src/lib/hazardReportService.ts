@@ -49,8 +49,15 @@ export class HazardReportService {
   /**
    * Save a hazard report to the database
    */
-  async saveHazardReport(formData: HazardReportFormData): Promise<SavedHazardReport> {
+  async saveHazardReport(formData: HazardReportFormData & { 
+    latitude?: string; 
+    longitude?: string; 
+    isDuplicate?: boolean 
+  }): Promise<SavedHazardReport> {
     console.log('[HazardReportService] Saving hazard report:', formData);
+
+    // Determine initial status - mark as duplicate if detected
+    const status = formData.isDuplicate ? 'DUPLIKAT' : 'PENDING_REVIEW';
 
     const reportData = {
       // Reporter Information
@@ -63,6 +70,8 @@ export class HazardReportService {
       location: formData.location,
       detail_location: formData.detailLocation,
       location_description: formData.locationDescription,
+      latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+      longitude: formData.longitude ? parseFloat(formData.longitude) : null,
       
       // PJA Information
       area_pja_bc: formData.areaPjaBc,
@@ -78,8 +87,8 @@ export class HazardReportService {
       // Image
       image_base64: formData.uploadedImage,
       
-      // Default status
-      status: 'PENDING_REVIEW'
+      // Status
+      status: status
     };
 
     const { data: savedReport, error } = await supabase
@@ -94,6 +103,11 @@ export class HazardReportService {
     }
 
     console.log('[HazardReportService] Report saved successfully:', savedReport);
+
+    // Skip similarity analysis if already marked as duplicate
+    if (formData.isDuplicate) {
+      return savedReport;
+    }
 
     // Find similar reports and create clusters if needed
     try {
