@@ -21,7 +21,8 @@ import {
   Calendar,
   MapPin,
   FileText,
-  Zap
+  Zap,
+  Home
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -77,7 +78,14 @@ export default function EvaluatorDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData().catch((error) => {
+      console.error('Failed to load dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat data dashboard. Silakan coba lagi.",
+        variant: "destructive",
+      });
+    });
   }, [filters]);
 
   const loadDashboardData = async () => {
@@ -207,21 +215,23 @@ export default function EvaluatorDashboard() {
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard Evaluator</h1>
-            <p className="text-muted-foreground">Kelola dan evaluasi laporan hazard</p>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/">
+                <Home className="h-5 w-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Dashboard Evaluator</h1>
+              <p className="text-muted-foreground">Kelola dan evaluasi laporan hazard</p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Link to="/">
-              <Button variant="outline">
-                <FileText className="h-4 w-4 mr-2" />
-                Mode Frontliner
-              </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/frontliner">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Mode Frontliner
             </Link>
-            <Link to="/settings">
-              <Button variant="outline">Settings</Button>
-            </Link>
-          </div>
+          </Button>
         </div>
 
         {/* Statistics Cards */}
@@ -293,8 +303,7 @@ export default function EvaluatorDashboard() {
                   <SelectItem value="ALL">Semua Status</SelectItem>
                   <SelectItem value="PENDING_REVIEW">Menunggu Review</SelectItem>
                   <SelectItem value="IN_PROGRESS">Dalam Proses</SelectItem>
-                  <SelectItem value="DUPLIKAT">Duplikat</SelectItem>
-                  <SelectItem value="BUKAN_HAZARD">Bukan Hazard</SelectItem>
+                  <SelectItem value="COMPLETED">Selesai</SelectItem>
                   <SelectItem value="DUPLIKAT">Duplikat</SelectItem>
                   <SelectItem value="BUKAN_HAZARD">Bukan Hazard</SelectItem>
                 </SelectContent>

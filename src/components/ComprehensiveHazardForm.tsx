@@ -30,8 +30,18 @@ const hazardFormSchema = z.object({
   subNonCompliance: z.string().min(1, 'Sub Ketidaksesuaian wajib dipilih'),
   quickAction: z.string().min(1, 'Quick Action wajib dipilih'),
   findingDescription: z.string().min(10, 'Deskripsi Temuan minimal 10 karakter'),
-  latitude: z.string().min(1, 'Latitude wajib diisi'),
-  longitude: z.string().min(1, 'Longitude wajib diisi'),
+  latitude: z.string()
+    .min(1, 'Latitude wajib diisi')
+    .refine((val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num >= -90 && num <= 90;
+    }, 'Latitude harus antara -90 dan 90'),
+  longitude: z.string()
+    .min(1, 'Longitude wajib diisi')
+    .refine((val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num >= -180 && num <= 180;
+    }, 'Longitude harus antara -180 dan 180'),
 });
 
 type HazardFormData = z.infer<typeof hazardFormSchema>;
@@ -512,7 +522,11 @@ Keterangan Lokasi: ${data.locationDescription}
                           <FormLabel className="text-xs">Latitude</FormLabel>
                           <FormControl>
                             <Input 
-                              {...field} 
+                              {...field}
+                              type="number"
+                              step="any"
+                              min="-90"
+                              max="90"
                               placeholder="Contoh: 2.0194521" 
                               className="text-sm"
                             />
@@ -529,7 +543,11 @@ Keterangan Lokasi: ${data.locationDescription}
                           <FormLabel className="text-xs">Longitude</FormLabel>
                           <FormControl>
                             <Input 
-                              {...field} 
+                              {...field}
+                              type="number"
+                              step="any"
+                              min="-180"
+                              max="180"
                               placeholder="Contoh: 117.6183817" 
                               className="text-sm"
                             />

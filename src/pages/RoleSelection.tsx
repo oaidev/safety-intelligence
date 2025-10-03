@@ -12,7 +12,7 @@ const RoleSelection = () => {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <Shield className="h-12 w-12 text-primary mr-3" />
-            <h1 className="text-4xl font-bold text-foreground">Safety Management System</h1>
+            <h1 className="text-4xl font-bold text-foreground">Safety Intelligence</h1>
           </div>
           <p className="text-xl text-muted-foreground">Pilih peran Anda untuk melanjutkan</p>
         </div>

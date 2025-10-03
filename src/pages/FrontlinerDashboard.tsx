@@ -10,11 +10,13 @@ import {
   Clock, 
   CheckCircle, 
   XCircle, 
-  ArrowLeft,
+  Home,
   BarChart3,
   FileText,
   Camera,
-  MapPin
+  MapPin,
+  ClipboardCheck,
+  Shield
 } from "lucide-react";
 import { HybridHazardAnalyzer } from "@/components/HybridHazardAnalyzer";
 import { useQuery } from "@tanstack/react-query";
@@ -75,25 +77,26 @@ const FrontlinerDashboard = () => {
       <header className="border-b bg-card shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => navigate('/')}
-                className="text-muted-foreground hover:text-foreground"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Kembali
+                <Home className="h-5 w-5" />
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Dashboard Frontliner</h1>
-                <p className="text-sm text-muted-foreground">Sistem Pelaporan Hazard & Keselamatan</p>
+              <div className="flex items-center gap-2">
+                <Shield className="h-6 w-6 text-primary" />
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">Dashboard Frontliner</h1>
+                  <p className="text-sm text-muted-foreground">Safety Intelligence</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-6 w-6 text-primary" />
-              <span className="font-semibold text-primary">Safety First</span>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/evaluator')}>
+              <ClipboardCheck className="h-4 w-4 mr-2" />
+              Mode Evaluator
+            </Button>
           </div>
         </div>
       </header>
