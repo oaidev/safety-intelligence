@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { hazardReportService } from '@/lib/hazardReportService';
 import { similarityService } from '@/lib/similarityService';
@@ -22,7 +23,9 @@ import {
   MapPin,
   FileText,
   Zap,
-  Home
+  Home,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -65,8 +68,16 @@ export default function EvaluatorDashboard() {
     pain_points: 0,
   });
   const [loading, setLoading] = useState(true);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+  const [hasMore, setHasMore] = useState(true);
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState({
-    search: '',
     status: '',
     location: '',
     dateFrom: '',
@@ -74,41 +85,75 @@ export default function EvaluatorDashboard() {
     category: ''
   });
   const [groupByClusters, setGroupByClusters] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Debounce search input
   useEffect(() => {
-    loadDashboardData().catch((error) => {
-      console.error('Failed to load dashboard data:', error);
-      toast({
-        title: "Error",
-        description: "Gagal memuat data dashboard. Silakan coba lagi.",
-        variant: "destructive",
-      });
-    });
-  }, [filters]);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500);
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+      const offset = (currentPage - 1) * itemsPerPage;
+      
       const [reportsData, statsData] = await Promise.all([
-        hazardReportService.getPendingReports(filters),
+        hazardReportService.getPendingReports({
+          search: debouncedSearch,
+          status: filters.status,
+          category: filters.category,
+          location: filters.location,
+          dateFrom: filters.dateFrom,
+          dateTo: filters.dateTo,
+          limit: itemsPerPage,
+          offset: offset,
+        }),
         hazardReportService.getDashboardStats()
       ]);
       
       setReports(reportsData);
       setStats(statsData);
-    } catch (error) {
+      setHasMore(reportsData.length === itemsPerPage);
+    } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load dashboard data',
-        variant: 'destructive',
-      });
+      
+      // Handle timeout specifically
+      if (error?.code === '57014' || error?.message?.includes('timeout')) {
+        toast({
+          title: "Timeout",
+          description: "Permintaan memakan waktu terlalu lama. Coba persempit filter Anda.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Gagal memuat data dashboard. Silakan coba lagi.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, itemsPerPage, debouncedSearch, filters, toast]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -288,9 +333,10 @@ export default function EvaluatorDashboard() {
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Cari ID, pelapor, lokasi, atau deskripsi..."
-                    value={filters.search}
-                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -351,7 +397,32 @@ export default function EvaluatorDashboard() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8">Loading...</div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-10 w-32" />
+                </div>
+                <div className="border rounded-lg">
+                  <div className="border-b p-4">
+                    <div className="flex gap-4">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  </div>
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="p-4 border-b last:border-0">
+                      <div className="flex gap-4">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 {groupByClusters ? (
@@ -536,6 +607,35 @@ export default function EvaluatorDashboard() {
               </div>
             )}
           </CardContent>
+          
+          {/* Pagination Controls */}
+          {!loading && reports.length > 0 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Halaman {currentPage} • Menampilkan {reports.length} laporan
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Sebelumnya
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={!hasMore || loading}
+                >
+                  Selanjutnya
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Cluster Analysis Section */}

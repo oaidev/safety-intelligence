@@ -146,7 +146,7 @@ export class HazardReportService {
   }
 
   /**
-   * Get pending hazard reports for evaluator dashboard
+   * Get pending hazard reports for evaluator dashboard with pagination
    */
   async getPendingReports(filters?: {
     dateFrom?: string;
@@ -155,64 +155,61 @@ export class HazardReportService {
     status?: string;
     category?: string;
     search?: string;
+    limit?: number;
+    offset?: number;
   }): Promise<any[]> {
-    let query = supabase
-      .from('hazard_reports')
-      .select(`
-        *,
-        hazard_action_items (
-          id,
-          jenis_tindakan,
-          status,
-          due_date,
-          priority_level
-        )
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      let query = supabase
+        .from('hazard_reports')
+        .select(`
+          *,
+          hazard_action_items (
+            id,
+            jenis_tindakan,
+            status,
+            due_date,
+            priority_level
+          )
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-    // Apply filters
-    if (filters?.dateFrom) {
-      query = query.gte('created_at', filters.dateFrom);
-    }
-    
-    if (filters?.dateTo) {
-      query = query.lte('created_at', filters.dateTo);
-    }
-    
-    if (filters?.location) {
-      query = query.ilike('location', `%${filters.location}%`);
-    }
-    
-    if (filters?.status) {
-      query = query.eq('status', filters.status);
-    }
-    
-    if (filters?.category) {
-      query = query.eq('non_compliance', filters.category);
-    }
+      // Apply filters
+      if (filters?.dateFrom) {
+        query = query.gte('created_at', filters.dateFrom);
+      }
+      if (filters?.dateTo) {
+        query = query.lte('created_at', filters.dateTo);
+      }
+      if (filters?.location) {
+        query = query.ilike('location', `%${filters.location}%`);
+      }
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+      if (filters?.category) {
+        query = query.eq('non_compliance', filters.category);
+      }
 
-    const { data: reports, error } = await query;
+      // Server-side search filter using OR condition
+      if (filters?.search) {
+        const searchTerm = filters.search;
+        query = query.or(`tracking_id.ilike.%${searchTerm}%,reporter_name.ilike.%${searchTerm}%,finding_description.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%,non_compliance.ilike.%${searchTerm}%`);
+      }
 
-    if (error) {
+      // Add pagination with default limit
+      const limit = filters?.limit || 50;
+      const offset = filters?.offset || 0;
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      return data || [];
+    } catch (error) {
       console.error('[HazardReportService] Error fetching reports:', error);
       throw error;
     }
-
-    // Apply search filter client-side for complex text search
-    let filteredReports = reports || [];
-    
-    if (filters?.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filteredReports = filteredReports.filter(report => 
-        report.tracking_id.toLowerCase().includes(searchTerm) ||
-        report.reporter_name.toLowerCase().includes(searchTerm) ||
-        report.location.toLowerCase().includes(searchTerm) ||
-        report.finding_description.toLowerCase().includes(searchTerm) ||
-        report.non_compliance.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    return filteredReports;
   }
 
   /**
