@@ -74,13 +74,19 @@ export default function EvaluatorDashboard() {
   const [itemsPerPage] = useState(50);
   const [hasMore, setHasMore] = useState(true);
   
-  // Filter states
+  // Filter states with default date (last 3 days)
+  const getDefaultDateFrom = () => {
+    const date = new Date();
+    date.setDate(date.getDate() - 3);
+    return date.toISOString().split('T')[0];
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState({
     status: '',
     location: '',
-    dateFrom: '',
+    dateFrom: getDefaultDateFrom(),
     dateTo: '',
     category: ''
   });
