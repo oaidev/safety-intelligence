@@ -97,7 +97,7 @@ const areaPjaMitra = [
   'PJA HRM (Coal Getting & Hauling) KDC'
 ];
 
-// Cascading dropdown data structure
+// Cascading dropdown data structure (sorted alphabetically)
 const nonComplianceData = {
   'APD': [
     'Tidak menggunakan APD',
@@ -105,6 +105,48 @@ const nonComplianceData = {
     'Melepas pelindung, sistem alarm atau alat pelindung peralatan pelindung diri tidak tersedia',
     'Cara Penggunaan APD',
     'Kesesuaian dan Kelayakan APD'
+  ],
+  'Bahaya Biologi': [
+    'Terdapat tanaman merambat yang lebat di area kerja yang berpotensi menjadi sarang ular'
+  ],
+  'Bahaya Eletrikal': [
+    'Pengamanan peralatan listrik'
+  ],
+  'DDP : Bekerja di Dekat Air': [
+    'Bekerja tidak sesuai kompetensi'
+  ],
+  'DDP : Kelayakan dan Pengoperasian Kendaraan / Unit': [
+    'Tidak menggunakan APD sesuai standard'
+  ],
+  'External Issue': [
+    'External Issue'
+  ],
+  'Fasilitas Gudang Handak': [
+    'Perawatan tanggul tidak dilakukan'
+  ],
+  'Fasilitas WMP': [
+    '[ENV] Sedimentasi tinggi pada kompartemen settling pond'
+  ],
+  'Fasilitas Workshop': [
+    '[ENV] Saluran Air/Drainase untuk fasilitas workshop tersumbat'
+  ],
+  'In Cabin Camera': [
+    'Tidak dilakukan follow up abnormal aktivitas yang terekam',
+    'Terekam abnormal aktivitas'
+  ],
+  'Kelayakan/Penggunaan Tools': [
+    'Kesesuaian penggunaan Supporting Tools'
+  ],
+  'Kelengkapan tanggap darurat': [
+    'Alat Tanggap Darurat Belum dilakukan Inspeksi',
+    'Fire Apparatus',
+    'Eye Wash'
+  ],
+  'Kondisi Kendaraan/unit': [
+    'Kelayakan Kendaraan/Unit'
+  ],
+  'Pembelian, Penanganan bahan dan kendali bahan': [
+    'Penyimpanan bahan dengan tidak tepat'
   ],
   'Pelanggaran bekerja di ketinggian': [
     'Bekerja tanpa safety body harness',
@@ -129,7 +171,12 @@ const nonComplianceData = {
     'Ketidak sesuaian dengan Plan (e.g DOP, Design, dll.)',
     'Pengawas Pekerjaan yang tidak memadai',
     'Pengawas berada di luar kabin atau pos pengawas di area Pit',
-    'Tidak Ada Traffic Man Yang Mengatur Lalu Lintas'
+    'Tidak Ada Traffic Man Yang Mengatur Lalu Lintas',
+    'Tanggung jawab tidak memadai',
+    'Bahaya di tempat kerja/ bahaya kerja tidak dikenali secara memadai'
+  ],
+  'Pengelolaan Sampah': [
+    '[ENV] Sampah dibuang tidak pada tempat sampah'
   ],
   'Pengoperasian Kendaraan / unit': [
     'Over speed',
@@ -145,6 +192,21 @@ const nonComplianceData = {
     'Meninggalkan kunci kontak di unit/kendaraan pada saat parkir',
     'Melakukan kegiatan makan/minum',
     'Melintas pada Jalur Berlawanan'
+  ],
+  'Perawatan Jalan': [
+    'Boulder'
+  ],
+  'Perlengkapan_Mesin_atau_Peralatan': [
+    'Pelepasan komponen-komponen yang tidak memadai atau penggantian komponen-komponen yang tidak sesuai',
+    'Penyesuaian/ perbaikan/ pemeliharaan yang tidak memadai',
+    'Ketersediaan alat tidak memadai'
+  ],
+  'Rambu': [
+    'Posisi Rambu tidak sesuai'
+  ],
+  'Standar Road Management': [
+    'Drainase tersumbat pada jalan angkut',
+    'Terdapat undulating di sepanjang jalan angkut'
   ]
 };
 
