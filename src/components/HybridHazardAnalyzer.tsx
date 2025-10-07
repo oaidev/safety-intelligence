@@ -8,6 +8,7 @@ import { ComprehensiveHazardForm } from '@/components/ComprehensiveHazardForm';
 import { AnalysisResults } from '@/components/AnalysisResults';
 import { KnowledgeBaseViewer } from '@/components/KnowledgeBaseViewer';
 import { PromptViewer } from '@/components/PromptViewer';
+import { KnowledgeBaseChunksViewer } from '@/components/KnowledgeBaseChunksViewer';
 import { AnalysisLoadingAnimation } from '@/components/AnalysisLoadingAnimation';
 import { HazardScoring } from '@/components/HazardScoring';
 import { ComprehensiveRecommendationDisplay } from '@/components/ComprehensiveRecommendationDisplay';
@@ -18,7 +19,6 @@ import { scoringService, type AnalysisResult as ScoringAnalysisResult } from '@/
 import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles,
-  RefreshCw,
   Zap,
   Database,
   MessageSquare,
@@ -234,32 +234,6 @@ export function HybridHazardAnalyzer() {
     }
   };
 
-  const forceRepopulate = async () => {
-    try {
-      // Import optimized RAG service
-      const { optimizedRagService } = await import('@/lib/optimizedRagService');
-      
-      toast({
-        title: 'Rebuilding Knowledge Base',
-        description: 'Clearing old data and rebuilding with correct embeddings...',
-      });
-      
-      await optimizedRagService.forceRepopulate();
-      
-      toast({
-        title: 'Knowledge Base Rebuilt',
-        description: 'Knowledge bases have been rebuilt with correct 384-dimensional embeddings.',
-      });
-    } catch (error) {
-      console.error('[HybridAnalyzer] Force repopulate error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to rebuild knowledge bases',
-        variant: 'destructive'
-      });
-    }
-  };
-
   const getProviderIcon = () => {
     if (serviceStatus.currentProvider === 'client-side') {
       return <Cpu className="h-4 w-4 text-green-500" />;
@@ -324,14 +298,14 @@ export function HybridHazardAnalyzer() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={forceRepopulate}
+                      onClick={() => setShowKnowledgeBase(true)}
                       className="text-muted-foreground hover:text-primary"
                     >
-                      <RefreshCw className="h-5 w-5" />
+                      <Database className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Fix Knowledge Base (Rebuild Embeddings)</p>
+                    <p>View Knowledge Base Chunks</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -382,7 +356,7 @@ export function HybridHazardAnalyzer() {
         </div>
         
         {/* Popups */}
-        <KnowledgeBaseViewer 
+        <KnowledgeBaseChunksViewer 
           open={showKnowledgeBase} 
           onOpenChange={setShowKnowledgeBase} 
         />

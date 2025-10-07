@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Eye, Trash2 } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -113,39 +113,6 @@ export function KnowledgeBaseList() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this knowledge base? This will also delete all associated chunks.')) {
-      return;
-    }
-
-    try {
-      // Delete chunks first
-      const { error: chunksError } = await supabase
-        .from('knowledge_base_chunks')
-        .delete()
-        .eq('knowledge_base_id', id);
-
-      if (chunksError) throw chunksError;
-
-      // Delete knowledge base
-      const { error } = await supabase
-        .from('knowledge_bases')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({ title: "Success", description: "Knowledge base deleted successfully" });
-      loadKnowledgeBases();
-    } catch (error) {
-      console.error('Error deleting knowledge base:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete knowledge base",
-        variant: "destructive"
-      });
-    }
-  };
 
   const openCreateDialog = () => {
     resetForm();
@@ -302,9 +269,6 @@ export function KnowledgeBaseList() {
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => openEditDialog(kb)}>
                       <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(kb.id)}>
-                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
