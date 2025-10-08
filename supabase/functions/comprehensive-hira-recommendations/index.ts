@@ -58,9 +58,49 @@ serve(async (req) => {
       console.error('[HIRA-Comprehensive] Search error:', searchError);
     }
 
+    // STRATEGI 1: CEK HIRA FIRST - Filter chunks with good similarity
+    const relevantHiraChunks = hiraChunks?.filter((chunk: any) => chunk.similarity > 0.5) || [];
+    
+    console.log(`[HIRA-Comprehensive] Found ${hiraChunks?.length || 0} total chunks, ${relevantHiraChunks.length} with similarity > 0.5`);
+
+    if (relevantHiraChunks.length >= 3) {
+      // ✅ HIRA DIRECT: Ada cukup hasil bagus dari HIRA
+      console.log('[HIRA-Direct] Using HIRA knowledge base directly (skip Gemini)');
+      
+      try {
+        const recommendations = parseHiraChunksDirectly(
+          relevantHiraChunks,
+          hazard_description,
+          location,
+          non_compliance
+        );
+        recommendations.source = 'hira';
+        recommendations.confidence = calculateConfidence(relevantHiraChunks);
+        
+        console.log(`[HIRA-Direct] Successfully parsed HIRA recommendations with confidence ${recommendations.confidence}`);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            recommendations,
+            strategy: 'HIRA_DIRECT',
+            hira_chunks_found: relevantHiraChunks.length,
+            average_similarity: (relevantHiraChunks.reduce((sum: number, c: any) => sum + c.similarity, 0) / relevantHiraChunks.length).toFixed(3)
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }}
+        );
+      } catch (parseError) {
+        console.error('[HIRA-Direct] Failed to parse HIRA chunks:', parseError);
+        console.log('[HIRA-Direct] Falling back to Gemini AI');
+        // Continue to Gemini fallback below
+      }
+    }
+
+    // STRATEGI 2: GEMINI FALLBACK - Tidak cukup HIRA atau parsing gagal
+    console.log('[HIRA-Fallback] Insufficient HIRA matches or parsing failed, using Gemini AI');
+    
     let hiraContext = '';
     if (hiraChunks && hiraChunks.length > 0) {
-      console.log(`[HIRA-Comprehensive] Found ${hiraChunks.length} relevant HIRA chunks`);
       hiraContext = hiraChunks
         .filter((chunk: any) => chunk.similarity > 0.3)
         .map((chunk: any) => chunk.chunk_text)
@@ -203,6 +243,7 @@ PENTING:
       JSON.stringify({ 
         success: true,
         recommendations,
+        strategy: 'GEMINI_FALLBACK',
         hira_chunks_found: hiraChunks?.length || 0
       }),
       { 
@@ -225,6 +266,135 @@ PENTING:
     );
   }
 });
+
+// Parse HIRA chunks directly without AI
+function parseHiraChunksDirectly(
+  chunks: any[],
+  hazardDescription: string,
+  location: string,
+  nonCompliance: string
+): SimplifiedHiraRecommendation {
+  console.log('[HIRA-Parser] Parsing HIRA chunks directly');
+  
+  // Aggregate all chunk texts
+  const allText = chunks.map(c => c.chunk_text).join('\n\n');
+  
+  // Extract root cause information
+  const lines = allText.split('\n').filter(l => l.trim());
+  
+  // Try to find structured HIRA data (format: "Category:Aspect:Cause:Actions")
+  let hazardCategory = 'Kecelakaan kerja';
+  let environmentalAspect = 'Kondisi kerja';
+  let potentialCause = nonCompliance || 'Ketidaksesuaian prosedur';
+  
+  // Look for category patterns in chunks
+  for (const line of lines) {
+    if (line.includes(':')) {
+      const parts = line.split(':');
+      if (parts.length >= 3) {
+        hazardCategory = parts[0]?.trim() || hazardCategory;
+        environmentalAspect = parts[1]?.trim() || environmentalAspect;
+        potentialCause = parts[2]?.trim() || potentialCause;
+        break;
+      }
+    }
+  }
+  
+  // Extract corrective actions from chunks
+  const correctiveActionsMap = new Map<string, Array<string>>();
+  
+  for (const line of lines) {
+    const lowerLine = line.toLowerCase();
+    
+    // Detect control type
+    let controlType = 'Administrasi';
+    if (lowerLine.includes('eliminasi')) controlType = 'Eliminasi';
+    else if (lowerLine.includes('substitusi')) controlType = 'Substitusi';
+    else if (lowerLine.includes('engineering') || lowerLine.includes('rekayasa')) controlType = 'Engineering';
+    
+    // Detect control level
+    let controlLevel = 'Preventive';
+    if (lowerLine.includes('detective') || lowerLine.includes('deteksi') || lowerLine.includes('observasi') || lowerLine.includes('inspeksi')) {
+      controlLevel = 'Detective';
+    } else if (lowerLine.includes('mitigative') || lowerLine.includes('mitigasi') || lowerLine.includes('mengurangi dampak')) {
+      controlLevel = 'Mitigative';
+    }
+    
+    const key = `${controlType}|${controlLevel}`;
+    
+    // Add action if it looks like an action (has verbs or is instructional)
+    if (line.length > 20 && (
+      lowerLine.includes('memastikan') ||
+      lowerLine.includes('melakukan') ||
+      lowerLine.includes('menggunakan') ||
+      lowerLine.includes('menghentikan') ||
+      lowerLine.includes('menyediakan') ||
+      lowerLine.includes('memasang') ||
+      lowerLine.includes('operator') ||
+      lowerLine.includes('pengawas') ||
+      lowerLine.includes('prosedur')
+    )) {
+      if (!correctiveActionsMap.has(key)) {
+        correctiveActionsMap.set(key, []);
+      }
+      correctiveActionsMap.get(key)!.push(line.trim());
+    }
+  }
+  
+  // Convert map to array format
+  const correctiveActions: Array<{
+    controlType: string;
+    controlLevel: string;
+    actions: string[];
+  }> = [];
+  
+  correctiveActionsMap.forEach((actions, key) => {
+    const [controlType, controlLevel] = key.split('|');
+    correctiveActions.push({
+      controlType,
+      controlLevel,
+      actions: actions.slice(0, 5) // Limit to 5 actions per group
+    });
+  });
+  
+  // Fallback if no actions found
+  if (correctiveActions.length === 0) {
+    correctiveActions.push({
+      controlType: 'Administrasi',
+      controlLevel: 'Preventive',
+      actions: [
+        `Memastikan kepatuhan terhadap prosedur ${nonCompliance}`,
+        `Melakukan pelatihan berkala untuk operator di ${location}`,
+        `Pengawasan rutin oleh supervisor`
+      ]
+    });
+  }
+  
+  const fullDescription = `${hazardCategory} / ${environmentalAspect} / ${potentialCause} menyebabkan risiko terkait ${hazardDescription}`;
+  
+  return {
+    source: 'hira',
+    confidence: 0.8, // Will be updated by calculateConfidence
+    rootCauseAnalysis: {
+      hazardCategory,
+      environmentalAspect,
+      potentialCause,
+      fullDescription
+    },
+    correctiveActions
+  };
+}
+
+// Calculate confidence based on HIRA chunk similarities
+function calculateConfidence(chunks: any[]): number {
+  if (!chunks || chunks.length === 0) return 0.6;
+  
+  const avgSimilarity = chunks.reduce((sum, c) => sum + (c.similarity || 0), 0) / chunks.length;
+  
+  if (avgSimilarity >= 0.7) return 0.9;
+  if (avgSimilarity >= 0.5) return 0.75;
+  return 0.6;
+}
 
 // Simple embedding generation function (fallback)
 async function generateEmbedding(text: string): Promise<number[]> {
