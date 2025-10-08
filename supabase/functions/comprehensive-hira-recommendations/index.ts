@@ -13,41 +13,22 @@ interface HazardAnalysisRequest {
   non_compliance: string;
 }
 
-interface ComprehensiveRecommendation {
+interface SimplifiedHiraRecommendation {
   source: 'hira' | 'ai';
   confidence: number;
   
-  potentialRootCauses: {
-    humanFactors: string[];
-    systemFactors: string[];
-    environmentalFactors: string[];
-    organizationalFactors: string[];
+  rootCauseAnalysis: {
+    hazardCategory: string;
+    environmentalAspect: string;
+    potentialCause: string;
+    fullDescription: string;
   };
   
-  correctiveActions: {
-    elimination: string[];
-    substitution: string[];
-    engineeringControls: string[];
-    administrativeControls: string[];
-  };
-  
-  preventiveControls: {
-    procedural: string[];
-    technical: string[];
-    management: string[];
-  };
-  
-  detectiveControls: {
-    routineInspections: string[];
-    continuousMonitoring: string[];
-    auditsAndReview: string[];
-  };
-  
-  mitigativeControls: {
-    emergencyResponse: string[];
-    damageControl: string[];
-    recoveryPlans: string[];
-  };
+  correctiveActions: Array<{
+    controlType: string;
+    controlLevel: string;
+    actions: string[];
+  }>;
 }
 
 serve(async (req) => {
@@ -92,7 +73,7 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY not configured');
     }
 
-    const comprehensivePrompt = `Anda adalah ahli HIRA (Hazard Identification and Risk Assessment) yang berpengalaman. Berikan analisis komprehensif berdasarkan temuan hazard berikut:
+    const simplifiedPrompt = `Anda adalah ahli HIRA (Hazard Identification and Risk Assessment) yang berpengalaman. Berikan analisis HIRA dalam format yang sederhana dan terstruktur.
 
 INFORMASI HAZARD:
 - Deskripsi: ${hazard_description}
@@ -106,36 +87,39 @@ Berikan respons dalam format JSON yang valid dengan struktur berikut:
 
 {
   "confidence": 0.85,
-  "potentialRootCauses": {
-    "humanFactors": ["faktor manusia spesifik seperti fatigue, lack of awareness, dll"],
-    "systemFactors": ["kegagalan sistem, gaps prosedur, defisiensi training"],
-    "environmentalFactors": ["kondisi lingkungan, masalah peralatan, desain tempat kerja"],
-    "organizationalFactors": ["pengawasan manajemen, breakdown komunikasi, keterbatasan resource"]
+  "rootCauseAnalysis": {
+    "hazardCategory": "kategori bahaya utama",
+    "environmentalAspect": "aspek lingkungan yang terkait",
+    "potentialCause": "penyebab potensial spesifik",
+    "fullDescription": "deskripsi lengkap dalam format: [hazardCategory] / [environmentalAspect] / [potentialCause] menyebabkan [dampak]"
   },
-  "correctiveActions": {
-    "elimination": ["solusi eliminasi hazard sepenuhnya"],
-    "substitution": ["penggantian dengan alternatif yang lebih aman"],
-    "engineeringControls": ["kontrol teknis, barrier fisik, safety devices"],
-    "administrativeControls": ["prosedur kerja, training, rotasi kerja"]
-  },
-  "preventiveControls": {
-    "procedural": ["P5M, program training, sertifikasi"],
-    "technical": ["standar peralatan, protokol maintenance"],
-    "management": ["standar supervisi, protokol komunikasi, fitness for work"]
-  },
-  "detectiveControls": {
-    "routineInspections": ["checklist harian, inspeksi area, pemeriksaan peralatan"],
-    "continuousMonitoring": ["observasi perilaku, condition monitoring"],
-    "auditsAndReview": ["assessment berkala, compliance check, evaluasi efektivitas"]
-  },
-  "mitigativeControls": {
-    "emergencyResponse": ["prosedur evakuasi, kontak darurat, protokol P3K"],
-    "damageControl": ["tindakan segera, containment measures, sistem backup"],
-    "recoveryPlans": ["pelaporan insiden, prosedur investigasi, lessons learned"]
-  }
+  "correctiveActions": [
+    {
+      "controlType": "Administrasi",
+      "controlLevel": "Preventive",
+      "actions": [
+        "Memastikan operator unit fit untuk bekerja sesuai dengan prosedur fatigue management melalui form fit to work",
+        "Pengawas melakukan komunikasi kontak positif dengan operator",
+        "Menghentikan kegiatan operator jika terdapat tanda tanda kelelahan/fatique sesuai prosedur Pengelolaan Kelelahan (fatigue management)"
+      ]
+    },
+    {
+      "controlType": "Administrasi",
+      "controlLevel": "Detective",
+      "actions": [
+        "Pengawas melakukan observasi operator saat bekerja"
+      ]
+    }
+  ]
 }
 
-PENTING: Berikan respons HANYA dalam format JSON yang valid. Gunakan bahasa Indonesia yang profesional dan spesifik sesuai konteks industri pertambangan.`;
+PENTING:
+1. Berikan respons HANYA dalam format JSON yang valid
+2. Gunakan bahasa Indonesia yang profesional dan spesifik sesuai konteks industri pertambangan
+3. controlType harus salah satu dari: "Eliminasi", "Substitusi", "Engineering", "Administrasi"
+4. controlLevel harus salah satu dari: "Preventive", "Detective", "Mitigative"
+5. Bisa ada multiple groups dengan tipe dan level yang berbeda
+6. fullDescription harus menjelaskan akar permasalahan secara lengkap dengan format "[Bahaya] / [Aspek Lingkungan] / [Penyebab Potensial] menyebabkan [dampak]"`;
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
@@ -145,7 +129,7 @@ PENTING: Berikan respons HANYA dalam format JSON yang valid. Gunakan bahasa Indo
         body: JSON.stringify({
           contents: [{
             role: "user",
-            parts: [{ text: comprehensivePrompt }]
+            parts: [{ text: simplifiedPrompt }]
           }],
           generationConfig: {
             temperature: 0.3,
@@ -171,7 +155,7 @@ PENTING: Berikan respons HANYA dalam format JSON yang valid. Gunakan bahasa Indo
     console.log('[HIRA-Comprehensive] Raw Gemini response:', responseText.substring(0, 200));
 
     // Parse JSON response
-    let recommendations: ComprehensiveRecommendation;
+    let recommendations: SimplifiedHiraRecommendation;
     try {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -186,42 +170,32 @@ PENTING: Berikan respons HANYA dalam format JSON yang valid. Gunakan bahasa Indo
       recommendations = JSON.parse(cleanJson);
       recommendations.source = hiraContext ? 'hira' : 'ai';
       
-      console.log('[HIRA-Comprehensive] Successfully parsed comprehensive recommendations');
+      console.log('[HIRA-Simplified] Successfully parsed simplified recommendations');
       
     } catch (parseError) {
-      console.error('[HIRA-Comprehensive] Parse error:', parseError);
+      console.error('[HIRA-Simplified] Parse error:', parseError);
       
       // Fallback recommendations
       recommendations = {
         source: 'ai',
         confidence: 0.6,
-        potentialRootCauses: {
-          humanFactors: [`Faktor manusia terkait ${non_compliance} - perlu investigasi mendalam`],
-          systemFactors: ['Evaluasi prosedur dan sistem yang ada'],
-          environmentalFactors: ['Analisis kondisi lingkungan kerja'],
-          organizationalFactors: ['Review struktur organisasi dan komunikasi']
+        rootCauseAnalysis: {
+          hazardCategory: 'Kecelakaan kerja',
+          environmentalAspect: 'Kondisi operator',
+          potentialCause: `Faktor terkait ${non_compliance}`,
+          fullDescription: `Kecelakaan kerja / Kondisi operator / Faktor terkait ${non_compliance} menyebabkan potensi insiden`
         },
-        correctiveActions: {
-          elimination: ['Evaluasi kemungkinan eliminasi hazard'],
-          substitution: ['Pertimbangkan substitusi dengan alternatif lebih aman'],
-          engineeringControls: ['Implementasi kontrol teknis yang sesuai'],
-          administrativeControls: ['Perbaikan prosedur dan pelatihan']
-        },
-        preventiveControls: {
-          procedural: ['Implementasi P5M yang efektif', 'Program pelatihan berkala'],
-          technical: ['Maintenance preventif', 'Inspeksi peralatan rutin'],
-          management: ['Pengawasan ketat', 'Komunikasi yang jelas']
-        },
-        detectiveControls: {
-          routineInspections: ['Inspeksi harian', 'Checklist keselamatan'],
-          continuousMonitoring: ['Monitoring kondisi', 'Observasi perilaku'],
-          auditsAndReview: ['Audit berkala', 'Review efektivitas']
-        },
-        mitigativeControls: {
-          emergencyResponse: ['Prosedur darurat', 'Training emergency'],
-          damageControl: ['Containment plan', 'Komunikasi darurat'],
-          recoveryPlans: ['Investigasi insiden', 'Lessons learned']
-        }
+        correctiveActions: [
+          {
+            controlType: 'Administrasi',
+            controlLevel: 'Preventive',
+            actions: [
+              'Implementasi prosedur keselamatan yang ketat',
+              'Pelatihan berkala untuk operator',
+              'Pengawasan rutin oleh supervisor'
+            ]
+          }
+        ]
       };
     }
 

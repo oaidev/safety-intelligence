@@ -262,7 +262,7 @@ class HiraRecommendationService {
     };
   }
 
-  // New function to get formatted recommendations for form fields
+  // New function to get simplified formatted recommendations
   async getFormattedRecommendations(hazardDescription: string, location: string, nonCompliance: string): Promise<{
     rootCauses: string;
     correctiveActions: string;
@@ -270,98 +270,73 @@ class HiraRecommendationService {
     message: string;
   }> {
     try {
-      console.log('[HIRA] Getting formatted recommendations for:', hazardDescription.substring(0, 100));
+      console.log('[HIRA] Getting simplified formatted recommendations for:', hazardDescription.substring(0, 100));
       
-      // Search HIRA knowledge base first
-      const hiraSearch = await this.searchHiraRecommendations(hazardDescription);
-      
-      if (hiraSearch.hasResults && hiraSearch.contexts.length > 0) {
-        console.log('[HIRA] Found contexts, parsing colon-separated HIRA data...');
-        console.log('[HIRA] Raw contexts:', hiraSearch.contexts);
+      // Call the edge function for simplified recommendations
+      const { data, error } = await supabase.functions.invoke('comprehensive-hira-recommendations', {
+        body: {
+          hazard_description: hazardDescription,
+          location: location,
+          non_compliance: nonCompliance
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.success && data.recommendations) {
+        const rec = data.recommendations;
         
-        // Parse colon-separated HIRA data format: Activity:Sub-activity:Task:RootCause:Consequence:ControlType:ControlAction
-        const rootCauses = new Set<string>();
-        const consequences = new Set<string>();
-        const actionsByType = new Map<string, Set<string>>();
+        // Format root causes
+        const formattedRootCauses = `Bahaya/Aspek Lingkungan/Penyebab Potensial\n${rec.rootCauseAnalysis.fullDescription}`;
         
-        hiraSearch.contexts.forEach(context => {
-          // Split by colons to get the fields
-          const fields = context.split(':');
-          
-          if (fields.length >= 7) {
-            // Field 3 (index 3): Root Cause
-            const rootCause = fields[3]?.trim();
-            if (rootCause && rootCause.length > 0) {
-              rootCauses.add(rootCause);
-            }
-            
-            // Field 4 (index 4): Consequence
-            const consequence = fields[4]?.trim();
-            if (consequence && consequence.length > 0) {
-              consequences.add(consequence);
-            }
-            
-            // Field 5 (index 5): Control Type
-            // Field 6 (index 6): Control Action  
-            const controlType = fields[5]?.trim();
-            const controlAction = fields[6]?.trim();
-            
-            if (controlType && controlAction && controlType.length > 0 && controlAction.length > 0) {
-              if (!actionsByType.has(controlType)) {
-                actionsByType.set(controlType, new Set());
-              }
-              actionsByType.get(controlType)!.add(controlAction);
-            }
-          } else {
-            console.log(`[HIRA] Skipping malformed context: ${context.substring(0, 100)}...`);
-          }
+        // Format corrective actions with multiple types/levels
+        const actionGroups: string[] = [];
+        
+        rec.correctiveActions.forEach((group: any) => {
+          const groupText = [
+            `Tipe Pengendalian : ${group.controlType}`,
+            `Jenis Pengendalian : ${group.controlLevel}`,
+            '',
+            'Pengendalian yang dilakukan (sesuai Hirarki)',
+            ...group.actions.map((action: string) => action)
+          ];
+          actionGroups.push(groupText.join('\n'));
         });
         
-        console.log('[HIRA] Extracted root causes:', Array.from(rootCauses));
-        console.log('[HIRA] Extracted consequences:', Array.from(consequences));
-        console.log('[HIRA] Extracted actions by type:', Object.fromEntries(actionsByType));
+        const formattedActions = actionGroups.join('\n\n\n');
         
-        // Format as bullet points - combine root causes and consequences
-        const allRootCauses = new Set([...rootCauses, ...consequences]);
-        const formattedRootCauses = allRootCauses.size > 0 
-          ? Array.from(allRootCauses).map(cause => `- ${cause}`).join('\n')
-          : '- Perlu investigasi mendalam untuk menentukan akar masalah yang tepat';
-        
-        // Format actions by control type
-        const formattedActions: string[] = [];
-        actionsByType.forEach((actions, controlType) => {
-          actions.forEach(action => {
-            formattedActions.push(`- Control ${controlType}: ${action}`);
-          });
-        });
-        
-        const finalFormattedActions = formattedActions.length > 0
-          ? formattedActions.join('\n')
-          : '- Control Preventive: Implementasi prosedur keselamatan yang ketat';
-        
-        console.log('[HIRA] Successfully formatted HIRA recommendations');
-        console.log('[HIRA] Final root causes:', formattedRootCauses);
-        console.log('[HIRA] Final actions:', finalFormattedActions);
+        console.log('[HIRA] Successfully formatted simplified recommendations');
         
         return {
           rootCauses: formattedRootCauses,
-          correctiveActions: finalFormattedActions,
-          source: 'hira',
-          message: 'Rekomendasi berdasarkan HIRA knowledge base'
+          correctiveActions: formattedActions,
+          source: rec.source,
+          message: rec.source === 'hira' ? 'Rekomendasi berdasarkan HIRA knowledge base' : 'Rekomendasi AI - silakan sesuaikan dengan kondisi lapangan'
         };
       }
       
-      // Fallback to AI with structured format
-      console.log('[HIRA] No HIRA match found, using AI fallback');
+      // Fallback to default format
+      console.log('[HIRA] Using fallback format');
       
-      const formattedRootCauses = `- Kurang konsentrasi dalam melakukan pekerjaan yang dapat menyebabkan insiden
-- Tidak mengikuti prosedur keselamatan yang telah ditetapkan
-- Kondisi lingkungan kerja yang tidak mendukung keselamatan`;
+      const formattedRootCauses = `Bahaya/Aspek Lingkungan/Penyebab Potensial
+Kurang konsentrasi dalam melakukan pekerjaan (kelelahan/fatigue) menyebabkan unit menabrak sesuatu`;
       
-      const formattedActions = `- Control Preventive: Memastikan operator fit untuk bekerja dan mengikuti prosedur
-- Control Preventive: Pelatihan berkala tentang keselamatan kerja
-- Control Detective: Pengawasan dan observasi operator saat bekerja
-- Control Engineering: Implementasi sistem keselamatan tambahan`;
+      const formattedActions = `Tipe Pengendalian : Administrasi
+Jenis Pengendalian : Preventive
+
+Pengendalian yang dilakukan (sesuai Hirarki)
+Memastikan operator unit fit untuk bekerja sesuai dengan prosedur fatigue management melalui form fit to work
+Pengawas melakukan komunikasi kontak positif dengan operator
+Menghentikan kegiatan operator jika terdapat tanda tanda kelelahan/fatique sesuai prosedur Pengelolaan Kelelahan (fatigue management)
+
+
+Tipe Pengendalian : Administrasi
+Jenis Pengendalian : Detective
+
+Pengendalian yang dilakukan (sesuai Hirarki)
+Pengawas melakukan observasi operator saat bekerja`;
       
       return {
         rootCauses: formattedRootCauses,
@@ -374,8 +349,8 @@ class HiraRecommendationService {
       console.error('[HIRA] Error getting formatted recommendations:', error);
       
       return {
-        rootCauses: '- Perlu investigasi lebih lanjut untuk menentukan akar masalah\n- Analisis mendalam diperlukan untuk identifikasi faktor penyebab',
-        correctiveActions: '- Control Preventive: Implementasi prosedur keselamatan\n- Control Detective: Monitoring dan inspeksi berkala\n- Control Engineering: Pemasangan peralatan keselamatan',
+        rootCauses: 'Bahaya/Aspek Lingkungan/Penyebab Potensial\nPerlu investigasi lebih lanjut untuk menentukan akar masalah',
+        correctiveActions: 'Tipe Pengendalian : Administrasi\nJenis Pengendalian : Preventive\n\nPengendalian yang dilakukan (sesuai Hirarki)\nImplementasi prosedur keselamatan\nMonitoring dan inspeksi berkala',
         source: 'ai',
         message: 'Rekomendasi default - silakan sesuaikan dengan kondisi lapangan'
       };
