@@ -187,11 +187,21 @@ class HiraRecommendationService {
     try {
       console.log('[HIRA] Getting comprehensive recommendations...');
       
+      // Generate embedding on client-side using the same 384-dim model
+      const { optimizedRagService } = await import('./optimizedRagService');
+      await optimizedRagService.initialize();
+      
+      const queryText = `${nonCompliance} ${hazardDescription}`;
+      const queryEmbedding = await optimizedRagService.generateEmbedding(queryText);
+      
+      console.log('[HIRA] Generated client-side embedding:', queryEmbedding.length, 'dimensions');
+      
       const { data, error } = await supabase.functions.invoke('comprehensive-hira-recommendations', {
         body: {
           hazard_description: hazardDescription,
           location: location,
-          non_compliance: nonCompliance
+          non_compliance: nonCompliance,
+          query_embedding: queryEmbedding // Pass 384-dim embedding
         }
       });
 
@@ -272,12 +282,22 @@ class HiraRecommendationService {
     try {
       console.log('[HIRA] Getting simplified formatted recommendations for:', hazardDescription.substring(0, 100));
       
+      // Generate embedding on client-side using the same 384-dim model
+      const { optimizedRagService } = await import('./optimizedRagService');
+      await optimizedRagService.initialize();
+      
+      const queryText = `${nonCompliance} ${hazardDescription}`;
+      const queryEmbedding = await optimizedRagService.generateEmbedding(queryText);
+      
+      console.log('[HIRA] Generated client-side embedding:', queryEmbedding.length, 'dimensions');
+      
       // Call the edge function for simplified recommendations
       const { data, error } = await supabase.functions.invoke('comprehensive-hira-recommendations', {
         body: {
           hazard_description: hazardDescription,
           location: location,
-          non_compliance: nonCompliance
+          non_compliance: nonCompliance,
+          query_embedding: queryEmbedding // Pass 384-dim embedding
         }
       });
 

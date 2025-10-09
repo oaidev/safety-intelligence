@@ -11,6 +11,7 @@ interface HazardAnalysisRequest {
   hazard_description: string;
   location: string;
   non_compliance: string;
+  query_embedding: number[]; // 384-dim embedding from client
 }
 
 interface SimplifiedHiraRecommendation {
@@ -37,30 +38,27 @@ serve(async (req) => {
   }
 
   try {
-    const { hazard_description, location, non_compliance }: HazardAnalysisRequest = await req.json();
+    const { hazard_description, location, non_compliance, query_embedding } = await req.json() as HazardAnalysisRequest;
     
-    console.log('[HIRA-Comprehensive] Processing request for:', hazard_description?.substring(0, 100));
+    if (!query_embedding || query_embedding.length !== 384) {
+      throw new Error('query_embedding must be provided with 384 dimensions');
+    }
+    
+    console.log('[HIRA-Comprehensive] Received request with client embedding:', { 
+      hazard_description: hazard_description.substring(0, 100), 
+      location, 
+      non_compliance: non_compliance.substring(0, 50),
+      embedding_dim: query_embedding.length
+    });
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Generate query embedding using the same model as HIRA import
-    const searchQuery = `${non_compliance} ${hazard_description}`;
-    const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke(
-      'generate-embedding',
-      { body: { text: searchQuery } }
-    );
-
-    if (embeddingError || !embeddingData?.embedding) {
-      console.error('[HIRA-Comprehensive] Embedding error:', embeddingError);
-      throw new Error('Failed to generate query embedding');
-    }
-
-    // Search HIRA knowledge base using vector similarity
+    // Use client-provided embedding for similarity search
     const { data: hiraChunks, error: searchError } = await supabase.rpc('similarity_search_hybrid', {
-      query_embedding: embeddingData.embedding,
+      query_embedding: query_embedding,
       kb_id: 'hira',
       match_count: 10,
       provider: 'client-side'
