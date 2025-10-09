@@ -46,9 +46,21 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Generate query embedding using the same model as HIRA import
+    const searchQuery = `${non_compliance} ${hazard_description}`;
+    const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke(
+      'generate-embedding',
+      { body: { text: searchQuery } }
+    );
+
+    if (embeddingError || !embeddingData?.embedding) {
+      console.error('[HIRA-Comprehensive] Embedding error:', embeddingError);
+      throw new Error('Failed to generate query embedding');
+    }
+
     // Search HIRA knowledge base using vector similarity
     const { data: hiraChunks, error: searchError } = await supabase.rpc('similarity_search_hybrid', {
-      query_embedding: await generateEmbedding(hazard_description),
+      query_embedding: embeddingData.embedding,
       kb_id: 'hira',
       match_count: 10,
       provider: 'client-side'
@@ -58,10 +70,10 @@ serve(async (req) => {
       console.error('[HIRA-Comprehensive] Search error:', searchError);
     }
 
-    // STRATEGI 1: CEK HIRA FIRST - Filter chunks with good similarity
-    const relevantHiraChunks = hiraChunks?.filter((chunk: any) => chunk.similarity > 0.5) || [];
+    // STRATEGI 1: CEK HIRA FIRST - Filter chunks with good similarity (lowered threshold to 0.3)
+    const relevantHiraChunks = hiraChunks?.filter((chunk: any) => chunk.similarity > 0.3) || [];
     
-    console.log(`[HIRA-Comprehensive] Found ${hiraChunks?.length || 0} total chunks, ${relevantHiraChunks.length} with similarity > 0.5`);
+    console.log(`[HIRA-Comprehensive] Found ${hiraChunks?.length || 0} total chunks, ${relevantHiraChunks.length} with similarity > 0.3`);
 
     if (relevantHiraChunks.length >= 3) {
       // ✅ HIRA DIRECT: Ada cukup hasil bagus dari HIRA
@@ -394,11 +406,4 @@ function calculateConfidence(chunks: any[]): number {
   if (avgSimilarity >= 0.7) return 0.9;
   if (avgSimilarity >= 0.5) return 0.75;
   return 0.6;
-}
-
-// Simple embedding generation function (fallback)
-async function generateEmbedding(text: string): Promise<number[]> {
-  // For now, return a dummy embedding for vector search
-  // In production, this should use the same embedding model as the client
-  return new Array(384).fill(0).map(() => Math.random() - 0.5);
 }
