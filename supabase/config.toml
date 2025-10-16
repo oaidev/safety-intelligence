@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.bulk-import-knowledge-base]
 verify_jwt = false
+
+[functions.comprehensive-hira-recommendations]
+verify_jwt = false
+
+[functions.generate-investigation-report]
+verify_jwt = false

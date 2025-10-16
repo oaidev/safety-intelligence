@@ -232,6 +232,56 @@ export type Database = {
         }
         Relationships: []
       }
+      investigation_reports: {
+        Row: {
+          audio_duration_seconds: number | null
+          audio_file_name: string
+          created_at: string
+          created_by: string | null
+          finalized_at: string | null
+          id: string
+          report_content: Json
+          status: string
+          tracking_id: string
+          transcript: string
+          updated_at: string
+        }
+        Insert: {
+          audio_duration_seconds?: number | null
+          audio_file_name: string
+          created_at?: string
+          created_by?: string | null
+          finalized_at?: string | null
+          id?: string
+          report_content: Json
+          status?: string
+          tracking_id?: string
+          transcript: string
+          updated_at?: string
+        }
+        Update: {
+          audio_duration_seconds?: number | null
+          audio_file_name?: string
+          created_at?: string
+          created_by?: string | null
+          finalized_at?: string | null
+          id?: string
+          report_content?: Json
+          status?: string
+          tracking_id?: string
+          transcript?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investigation_reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base_chunks: {
         Row: {
           chunk_index: number
@@ -396,7 +446,7 @@ export type Database = {
       }
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
-        Returns: string
+        Returns: unknown
       }
       similarity_search: {
         Args: { kb_id: string; match_count?: number; query_embedding: string }
