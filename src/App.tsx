@@ -11,6 +11,7 @@ import EvaluatorDashboard from "./pages/EvaluatorDashboard";
 import HazardEvaluationPage from "./pages/HazardEvaluationPage";
 import RoleSelection from "./pages/RoleSelection";
 import FrontlinerDashboard from "./pages/FrontlinerDashboard";
+import InvestigationReportGenerator from "./pages/InvestigationReportGenerator";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/frontliner" element={<FrontlinerDashboard />} />
           <Route path="/evaluator" element={<EvaluatorDashboard />} />
           <Route path="/evaluate/:id" element={<HazardEvaluationPage />} />
+          <Route path="/investigation-report" element={<InvestigationReportGenerator />} />
           <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
