@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Download, Edit, RefreshCw, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Textarea } from '@/components/ui/textarea';
+import { ThinkingProcessViewer, ThinkingStep, ThinkingProcess } from './ThinkingProcessViewer';
 
 interface ReportGenerationStepProps {
   transcript: string;
@@ -23,6 +24,7 @@ const ReportGenerationStep = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [trackingId, setTrackingId] = useState<string>('');
+  const [thinkingProcess, setThinkingProcess] = useState<ThinkingProcess | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -33,15 +35,58 @@ const ReportGenerationStep = ({
   const generateReport = async () => {
     setIsGenerating(true);
     setReportData('');
+    const startTime = Date.now();
+    const steps: ThinkingStep[] = [];
 
     try {
+      // Step 1: Validate transcript
+      const step1Start = Date.now();
+      const wordCount = transcript.split(/\s+/).length;
+      const isValid = transcript.length >= 50;
+      
+      steps.push({
+        step: 1,
+        name: 'Validasi Transcript',
+        description: 'Memastikan transcript cukup panjang dan informatif',
+        timestamp: step1Start,
+        duration: Date.now() - step1Start,
+        details: {
+          transcriptLength: transcript.length,
+          wordCount: wordCount,
+          isValid: isValid,
+          explanation: isValid 
+            ? `✅ Transcript memiliki ${wordCount} kata dan sudah cukup untuk dianalisis oleh AI.`
+            : `⚠️ Transcript terlalu pendek (${transcript.length} characters). Minimum 50 characters diperlukan.`
+        },
+        status: isValid ? 'success' : 'warning'
+      });
+
       toast({
         title: 'Generating report...',
         description: 'AI sedang menganalisis transcript dan membuat laporan investigasi',
       });
 
+      // Step 2: Call edge function for report generation
+      const step2Start = Date.now();
       const { data, error } = await supabase.functions.invoke('generate-investigation-report', {
         body: { transcript }
+      });
+      
+      steps.push({
+        step: 2,
+        name: 'Generate Report dengan Gemini',
+        description: 'AI membaca transcript dan membuat laporan investigasi lengkap',
+        timestamp: step2Start,
+        duration: Date.now() - step2Start,
+        details: {
+          model: 'gemini-2.0-flash',
+          temperature: 0.3,
+          maxTokens: 8000,
+          transcriptLength: transcript.length,
+          explanation: '🤖 Gemini AI membaca seluruh transcript audio dan mengekstrak informasi penting untuk membuat laporan investigasi terstruktur dengan 5W+1H (What, Who, When, Where, Why, How).',
+          error: error ? error.message : undefined
+        },
+        status: error ? 'error' : 'success'
       });
 
       if (error) throw error;
@@ -50,10 +95,32 @@ const ReportGenerationStep = ({
         throw new Error('Tidak ada report yang dikembalikan dari AI');
       }
 
+      // Step 3: Format and save report
+      const step3Start = Date.now();
       setReportData(data.report);
 
-      // Save to database
       await saveReportToDatabase(data.report);
+      
+      steps.push({
+        step: 3,
+        name: 'Save to Database',
+        description: 'Menyimpan laporan ke database',
+        timestamp: step3Start,
+        duration: Date.now() - step3Start,
+        details: {
+          reportLength: data.report.length,
+          trackingId: trackingId || 'Generated',
+          explanation: '💾 Laporan disimpan ke database dengan status DRAFT. Tracking ID akan di-generate otomatis untuk referensi.'
+        },
+        status: 'success'
+      });
+
+      // Set thinking process
+      setThinkingProcess({
+        steps: steps,
+        totalDuration: Date.now() - startTime,
+        summary: `Investigation report berhasil dibuat dari ${wordCount} kata transcript dalam ${Math.round((Date.now() - startTime) / 1000)} detik.`
+      });
 
       toast({
         title: 'Laporan berhasil dibuat!',
@@ -207,6 +274,16 @@ const ReportGenerationStep = ({
           Download PDF
         </Button>
       </div>
+
+      {/* Thinking Process */}
+      {thinkingProcess && (
+        <div className="mb-6">
+          <ThinkingProcessViewer 
+            thinkingProcess={thinkingProcess} 
+            compact 
+          />
+        </div>
+      )}
 
       <Card className="p-8">
         {isEditing ? (

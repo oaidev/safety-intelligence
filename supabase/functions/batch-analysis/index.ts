@@ -26,6 +26,7 @@ interface BatchAnalysisResponse {
     reasoning: string;
     color: string;
     processingTime: number;
+    thinkingSteps?: any[];
   }[];
   totalProcessingTime: number;
 }
@@ -50,19 +51,37 @@ serve(async (req) => {
     // Create batch prompts for parallel processing
     const batchPromises = analyses.map(async (analysis, index) => {
       const individualStartTime = Date.now();
+      const steps: any[] = [];
       
       try {
-        // Safely handle undefined values
+        // Step 1: Prepare Prompt
+        const step1Start = Date.now();
         const safeContext = analysis.retrievedContext || 'No relevant context found';
         const safeHazardDescription = hazardDescription || 'No hazard description provided';
         
-        // Replace placeholders in prompt template
         const finalPrompt = analysis.promptTemplate
           .replace('{RETRIEVED_CONTEXT}', safeContext)
           .replace('{USER_INPUT}', safeHazardDescription);
+        
+        steps.push({
+          step: 1,
+          name: 'Konstruksi Prompt',
+          description: 'Menggabungkan context + hazard description ke dalam template prompt',
+          duration: Date.now() - step1Start,
+          details: {
+            template: analysis.promptTemplate.substring(0, 100) + '...',
+            contextLength: safeContext.length,
+            hazardLength: safeHazardDescription.length,
+            promptLength: finalPrompt.length,
+            explanation: `Prompt template dari ${analysis.knowledgeBaseName} digabung dengan retrieved context dan hazard description untuk membuat prompt lengkap yang akan dikirim ke AI.`
+          },
+          status: 'success'
+        });
 
         console.log(`[BatchAnalysis] Sending request ${index + 1}/${analyses.length} to Gemini API`);
 
+        // Step 2: Call Gemini API
+        const step2Start = Date.now();
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
           {
@@ -83,6 +102,22 @@ serve(async (req) => {
             }),
           }
         );
+
+        steps.push({
+          step: 2,
+          name: 'Gemini API Call',
+          description: 'Mengirim prompt ke Gemini untuk dianalisis',
+          duration: Date.now() - step2Start,
+          details: {
+            model: 'gemini-2.5-flash-lite',
+            temperature: 0.1,
+            maxOutputTokens: 3072,
+            status: response.ok ? 'success' : 'error',
+            statusCode: response.status,
+            explanation: 'Request dikirim ke Google Gemini API. Model akan membaca prompt dan mengembalikan analysis dalam format KATEGORI, CONFIDENCE, dan ALASAN.'
+          },
+          status: response.ok ? 'success' : 'error'
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -142,26 +177,45 @@ serve(async (req) => {
            isPartialResponse = true;
          }
         
-        console.log(`[BatchAnalysis] Parsed response for ${analysis.knowledgeBaseName}:`, fullResponse);
+         console.log(`[BatchAnalysis] Parsed response for ${analysis.knowledgeBaseName}:`, fullResponse);
         
-         // Parse response
-         const categoryMatch = fullResponse.match(/KATEGORI(?:\s+\w+)?:\s*(.+?)(?:\n|$)/i);
-         const confidenceMatch = fullResponse.match(/CONFIDENCE:\s*(.+?)(?:\n|$)/i);
-         const reasoningMatch = fullResponse.match(/ALASAN:\s*(.+?)$/is);
+          // Step 3: Parse Response
+          const step3Start = Date.now();
+          const categoryMatch = fullResponse.match(/KATEGORI(?:\s+\w+)?:\s*(.+?)(?:\n|$)/i);
+          const confidenceMatch = fullResponse.match(/CONFIDENCE:\s*(.+?)(?:\n|$)/i);
+          const reasoningMatch = fullResponse.match(/ALASAN:\s*(.+?)$/is);
 
-         let category = categoryMatch?.[1]?.trim() || 'Unknown';
-         let confidence = confidenceMatch?.[1]?.trim() || 'Unknown';
-         let reasoning = reasoningMatch?.[1]?.trim() || 'No reasoning provided';
-         
-         // Add indicators for partial responses
-         if (isPartialResponse) {
-           if (category !== 'Response Truncated' && category !== 'Analysis Error' && category !== 'No Response') {
-             category += ' (Partial)';
-           }
-           if (confidence === 'Unknown') {
-             confidence = 'Low (Truncated)';
-           }
-         }
+          let category = categoryMatch?.[1]?.trim() || 'Unknown';
+          let confidence = confidenceMatch?.[1]?.trim() || 'Unknown';
+          let reasoning = reasoningMatch?.[1]?.trim() || 'No reasoning provided';
+          
+          // Add indicators for partial responses
+          if (isPartialResponse) {
+            if (category !== 'Response Truncated' && category !== 'Analysis Error' && category !== 'No Response') {
+              category += ' (Partial)';
+            }
+            if (confidence === 'Unknown') {
+              confidence = 'Low (Truncated)';
+            }
+          }
+
+        steps.push({
+          step: 3,
+          name: 'Parse AI Response',
+          description: 'Ekstrak kategori, confidence, dan reasoning dari jawaban AI',
+          duration: Date.now() - step3Start,
+          details: {
+            rawResponseLength: fullResponse.length,
+            extractedFields: {
+              category: category,
+              confidence: confidence,
+              reasoning: reasoning.substring(0, 100) + '...'
+            },
+            isPartial: isPartialResponse,
+            explanation: 'Response dari AI di-parse menggunakan regex untuk mengekstrak 3 komponen utama: KATEGORI (jenis hazard), CONFIDENCE (tingkat keyakinan), dan ALASAN (penjelasan detail).'
+          },
+          status: 'success'
+        });
 
         const processingTime = Date.now() - individualStartTime;
         
@@ -175,6 +229,7 @@ serve(async (req) => {
           reasoning,
           color: analysis.color,
           processingTime,
+          thinkingSteps: steps,
         };
       } catch (error) {
         const processingTime = Date.now() - individualStartTime;

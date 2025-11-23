@@ -28,6 +28,22 @@ export interface DocumentChunk {
   knowledgeBaseId?: string;
 }
 
+export interface ThinkingStep {
+  step: number;
+  name: string;
+  description: string;
+  timestamp: number;
+  duration: number;
+  details: any;
+  status: 'success' | 'error' | 'warning';
+}
+
+export interface ThinkingProcess {
+  steps: ThinkingStep[];
+  totalDuration: number;
+  summary: string;
+}
+
 export interface AnalysisResult {
   knowledgeBaseId: string;
   knowledgeBaseName: string;
@@ -38,6 +54,7 @@ export interface AnalysisResult {
   fullResponse: string;
   processingTime: number;
   color: string;
+  thinkingProcess?: ThinkingProcess;
 }
 
 export interface MultiAnalysisResult {

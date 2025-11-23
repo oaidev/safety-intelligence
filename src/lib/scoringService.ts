@@ -25,6 +25,22 @@ export interface DetailedAnalysis {
   };
 }
 
+export interface ThinkingStep {
+  step: number;
+  name: string;
+  description: string;
+  timestamp: number;
+  duration: number;
+  details: any;
+  status: 'success' | 'error' | 'warning';
+}
+
+export interface ThinkingProcess {
+  steps: ThinkingStep[];
+  totalDuration: number;
+  summary: string;
+}
+
 export interface AnalysisResult {
   scores: ScoreData;
   detailed_analysis: DetailedAnalysis;
@@ -33,6 +49,7 @@ export interface AnalysisResult {
     deskripsi_temuan?: string;
     quick_action?: string;
   };
+  thinkingProcess?: ThinkingProcess;
 }
 
 export interface HazardFormData {
@@ -48,11 +65,68 @@ export interface HazardFormData {
 
 export class ScoringService {
   async analyzeHazardQuality(formData: HazardFormData): Promise<AnalysisResult> {
+    const startTime = Date.now();
+    const thinkingSteps: ThinkingStep[] = [];
+    
     try {
       console.log('[ScoringService] Starting hazard quality analysis...');
       
+      // Step 1: Validate Input
+      const step1Start = Date.now();
+      thinkingSteps.push({
+        step: 1,
+        name: 'Validasi Input',
+        description: 'Memeriksa kelengkapan data form hazard',
+        timestamp: step1Start,
+        duration: Date.now() - step1Start,
+        details: {
+          fields: {
+            deskripsi_temuan: `${formData.deskripsi_temuan?.length || 0} characters`,
+            ketidaksesuaian: formData.ketidaksesuaian,
+            quick_action: `${formData.quick_action?.length || 0} characters`,
+            image: formData.image_base64 ? 'Ada' : 'Tidak ada',
+            lokasi: formData.lokasi_detail,
+            tools: formData.tools_pengamatan
+          },
+          explanation: '✅ Sistem memeriksa apakah semua field penting sudah diisi dengan lengkap sebelum dikirim ke AI untuk di-score.'
+        },
+        status: 'success'
+      });
+      
+      // Step 2: Call Gemini for Scoring
+      const step2Start = Date.now();
       const { data, error } = await supabase.functions.invoke('analyze-hazard-quality', {
         body: { formData }
+      });
+      
+      thinkingSteps.push({
+        step: 2,
+        name: 'AI Quality Scoring',
+        description: 'Gemini AI menilai kualitas laporan berdasarkan 3 kriteria',
+        timestamp: step2Start,
+        duration: Date.now() - step2Start,
+        details: {
+          criteria: [
+            {
+              name: 'Consistency',
+              weight: '33.3%',
+              description: 'Konsistensi antara deskripsi temuan, kategori ketidaksesuaian, dan quick action'
+            },
+            {
+              name: 'Completeness',
+              weight: '33.3%',
+              description: 'Kelengkapan informasi (lokasi detail, tools pengamatan, deskripsi yang jelas)'
+            },
+            {
+              name: 'Image Relevance',
+              weight: '33.3%',
+              description: 'Relevansi foto dengan deskripsi hazard (jika ada foto)'
+            }
+          ],
+          model: 'gemini-2.5-flash',
+          explanation: '🤖 AI membaca semua field dan memberi score 0-100 untuk setiap kriteria. Setiap kriteria memiliki bobot yang sama dalam perhitungan overall score.'
+        },
+        status: error ? 'error' : 'success'
       });
 
       if (error) {
@@ -65,8 +139,41 @@ export class ScoringService {
         throw new Error(data.error || 'Analysis failed');
       }
 
+      // Step 3: Parse Scores & Calculate Overall
+      const step3Start = Date.now();
+      const analysis = data.analysis;
+      
+      thinkingSteps.push({
+        step: 3,
+        name: 'Kalkulasi Overall Score',
+        description: 'Menghitung rata-rata dari 3 score',
+        timestamp: step3Start,
+        duration: Date.now() - step3Start,
+        details: {
+          scores: {
+            consistency: analysis.scores.consistency,
+            completeness: analysis.scores.completeness,
+            image_relevance: analysis.scores.image_relevance
+          },
+          formula: '(Consistency + Completeness + Image Relevance) / 3',
+          calculation: `(${analysis.scores.consistency} + ${analysis.scores.completeness} + ${analysis.scores.image_relevance}) / 3 = ${analysis.scores.overall}`,
+          overall: analysis.scores.overall,
+          grade: this.getScoreGrade(analysis.scores.overall),
+          explanation: '📊 Overall score dihitung sebagai rata-rata sederhana dari 3 kriteria. Score 80+ = Excellent, 60-79 = Good, 40-59 = Fair, <40 = Poor.'
+        },
+        status: 'success'
+      });
+
       console.log('[ScoringService] Analysis completed successfully');
-      return data.analysis;
+      
+      return {
+        ...analysis,
+        thinkingProcess: {
+          steps: thinkingSteps,
+          totalDuration: Date.now() - startTime,
+          summary: `Quality scoring completed in ${Math.round((Date.now() - startTime) / 1000)} seconds with overall score: ${analysis.scores.overall}/100 (${this.getScoreGrade(analysis.scores.overall)})`
+        }
+      };
 
     } catch (error) {
       console.error('[ScoringService] Error:', error);

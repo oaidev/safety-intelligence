@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
   FileDown
 } from 'lucide-react';
 import { AnalysisResult, scoringService } from '@/lib/scoringService';
+import { ThinkingProcessViewer } from './ThinkingProcessViewer';
 
 interface HazardScoringProps {
   analysis: AnalysisResult;
@@ -119,6 +120,16 @@ export function HazardScoring({ analysis, onImproveReport, onExportReport }: Haz
           </div>
           
         </CardContent>
+
+        {/* Thinking Process in Overall Card */}
+        {analysis.thinkingProcess && (
+          <CardFooter className="pt-4 border-t">
+            <ThinkingProcessViewer 
+              thinkingProcess={analysis.thinkingProcess} 
+              compact 
+            />
+          </CardFooter>
+        )}
       </Card>
 
       {/* Detailed Score Breakdown */}

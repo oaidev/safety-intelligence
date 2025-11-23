@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { AnalysisResult, MultiAnalysisResult } from '@/lib/multiRagService';
+import { ThinkingProcessViewer } from './ThinkingProcessViewer';
 
 interface AnalysisResultsProps {
   results: MultiAnalysisResult | null;
@@ -197,6 +198,16 @@ function SingleAnalysisResult({
           </h4>
           <p className="text-sm text-muted-foreground leading-relaxed">{result.reasoning}</p>
         </div>
+
+        {/* Thinking Process */}
+        {result.thinkingProcess && (
+          <div className="pt-3 border-t">
+            <ThinkingProcessViewer 
+              thinkingProcess={result.thinkingProcess} 
+              compact 
+            />
+          </div>
+        )}
 
       </CardContent>
     </Card>

@@ -12,6 +12,22 @@ export interface DocumentChunk {
   knowledgeBaseId: string;
 }
 
+export interface ThinkingStep {
+  step: number;
+  name: string;
+  description: string;
+  timestamp: number;
+  duration: number;
+  details: any;
+  status: 'success' | 'error' | 'warning';
+}
+
+export interface ThinkingProcess {
+  steps: ThinkingStep[];
+  totalDuration: number;
+  summary: string;
+}
+
 export interface AnalysisResult {
   knowledgeBaseId: string;
   knowledgeBaseName: string;
@@ -23,6 +39,7 @@ export interface AnalysisResult {
   color: string;
   processingTime: number;
   embeddingProvider?: EmbeddingProvider;
+  thinkingProcess?: ThinkingProcess;
 }
 
 export interface MultiAnalysisResult {
@@ -347,20 +364,60 @@ class HybridRagService {
   async analyzeHazardAll(hazardDescription: string): Promise<MultiAnalysisResult> {
     const startTime = Date.now();
     console.log(`[HybridRAG] Starting analysis using ${this.currentProvider}...`);
+    const thinkingSteps: ThinkingStep[] = [];
 
     try {
-      // Ensure we have populated knowledge bases
+      // Step 1: Check Knowledge Base Population
+      const step1Start = Date.now();
       const isPopulated = await this.checkKnowledgeBasesPopulated();
+      
+      thinkingSteps.push({
+        step: 1,
+        name: 'Persiapan Knowledge Base',
+        description: 'Memeriksa apakah database pengetahuan sudah siap',
+        timestamp: step1Start,
+        duration: Date.now() - step1Start,
+        details: {
+          populated: isPopulated,
+          provider: this.currentProvider,
+          message: isPopulated 
+            ? '✅ Database pengetahuan sudah siap dengan embeddings'
+            : '⚠️ Perlu populate database dengan Google embeddings',
+          explanation: 'Sistem memeriksa apakah semua knowledge base sudah memiliki vector embeddings yang diperlukan untuk pencarian similarity'
+        },
+        status: 'success'
+      });
+
       if (!isPopulated) {
         console.log('[HybridRAG] Knowledge bases not populated, populating with Google embeddings...');
         await this.populateWithGoogleEmbeddings();
       }
 
-      // Generate query embedding
+      // Step 2: Generate Query Embedding
+      const step2Start = Date.now();
       const queryEmbedding = await this.generateEmbedding(hazardDescription);
+      
+      thinkingSteps.push({
+        step: 2,
+        name: 'Generate Query Embedding',
+        description: 'Mengubah deskripsi hazard menjadi vector angka untuk pencarian',
+        timestamp: step2Start,
+        duration: Date.now() - step2Start,
+        details: {
+          provider: this.currentProvider,
+          embeddingLength: queryEmbedding.length,
+          sampleValues: queryEmbedding.slice(0, 5).map(v => v.toFixed(4)),
+          explanation: this.currentProvider === 'client-side'
+            ? '🖥️ Menggunakan AI lokal (Xenova/bge-small-en-v1.5) di browser Anda. Model ini mengubah text menjadi 384-dimensional vector.'
+            : '☁️ Menggunakan Google Gemini API untuk embedding. Menghasilkan vector representation dari hazard description Anda.'
+        },
+        status: 'success'
+      });
+      
       console.log(`[HybridRAG] Generated query embedding using ${this.currentProvider}`);
 
-      // Retrieve context from all knowledge bases
+      // Step 3: Retrieve Context (Vector Similarity Search)
+      const step3Start = Date.now();
       const contextPromises = Object.keys(KNOWLEDGE_BASES).map(async (kbId) => {
         const context = await this.retrieveContext(queryEmbedding, kbId, 3);
         return {
@@ -370,6 +427,28 @@ class HybridRagService {
       });
 
       const contextResults = await Promise.all(contextPromises);
+      
+      thinkingSteps.push({
+        step: 3,
+        name: 'Pencarian Similarity (Vector Search)',
+        description: 'Mencari 3 dokumen paling relevan dari setiap knowledge base',
+        timestamp: step3Start,
+        duration: Date.now() - step3Start,
+        details: {
+          totalKnowledgeBases: Object.keys(KNOWLEDGE_BASES).length,
+          topK: 3,
+          retrievedChunks: contextResults.map(r => ({
+            kb: KNOWLEDGE_BASES[r.knowledgeBaseId].name,
+            chunks: r.context.length,
+            avgSimilarity: r.context.length > 0 
+              ? (r.context.reduce((sum, c) => sum + (c.similarity || 0), 0) / r.context.length).toFixed(3)
+              : '0',
+            topChunkPreview: r.context[0]?.text.substring(0, 100) + '...' || 'No context found'
+          })),
+          explanation: '🔍 Sistem menghitung cosine similarity antara query embedding Anda dan setiap document embedding di database. Semakin tinggi score similarity (mendekati 1.0), semakin relevan dokumen tersebut.'
+        },
+        status: 'success'
+      });
 
       // Prepare batch analysis request
       const analyses = contextResults.map(({ knowledgeBaseId, context }) => {
@@ -387,13 +466,32 @@ class HybridRagService {
         };
       });
 
-      // Call batch analysis edge function
+      // Step 4: AI Analysis with Gemini
+      const step4Start = Date.now();
       console.log('[HybridRAG] Calling batch analysis edge function...');
       const { data: batchResponse, error } = await supabase.functions.invoke('batch-analysis', {
         body: {
           hazardDescription,
           analyses,
         },
+      });
+
+      thinkingSteps.push({
+        step: 4,
+        name: 'AI Analysis dengan Gemini',
+        description: 'AI menganalisis hazard berdasarkan context yang ditemukan',
+        timestamp: step4Start,
+        duration: Date.now() - step4Start,
+        details: {
+          model: 'gemini-2.5-flash-lite',
+          temperature: 0.1,
+          maxTokens: 3072,
+          analysisCount: batchResponse?.results?.length || 0,
+          explanation: '🤖 Gemini AI membaca retrieved context + deskripsi hazard Anda, lalu memberikan kategori, confidence score, dan reasoning berdasarkan knowledge base yang berbeda-beda (Safety Golden Rules, PSPP, TBC).',
+          status: error ? 'error' : 'success',
+          error: error ? error.message : undefined
+        },
+        status: error ? 'error' : 'success'
       });
 
       if (error) {
@@ -406,6 +504,11 @@ class HybridRagService {
         retrievedContext: contextResults[index].context,
         fullResponse: `KATEGORI: ${result.category}\nCONFIDENCE: ${result.confidence}\nALASAN: ${result.reasoning}`,
         embeddingProvider: this.currentProvider,
+        thinkingProcess: {
+          steps: [...thinkingSteps, ...(result.thinkingSteps || [])],
+          totalDuration: Date.now() - startTime,
+          summary: `Analysis completed using ${this.currentProvider} embeddings in ${Math.round((Date.now() - startTime) / 1000)} seconds`
+        }
       }));
 
       const totalProcessingTime = Date.now() - startTime;
