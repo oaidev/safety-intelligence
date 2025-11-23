@@ -6,27 +6,85 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface InvestigationReportRequest {
+  audio?: string; // base64
+  audioFileName: string;
+  image?: string; // base64 (optional)
+  imageFileName?: string;
+  transcript?: string; // If already transcribed locally
+  useLocalWhisper?: boolean;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { transcript } = await req.json();
-    
-    if (!transcript || transcript.length < 50) {
-      throw new Error('Transcript terlalu pendek atau tidak valid (minimum 50 karakter)');
-    }
+    const { audio, audioFileName, image, imageFileName, transcript, useLocalWhisper } = await req.json() as InvestigationReportRequest;
     
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
       throw new Error('GEMINI_API_KEY not configured');
     }
+
+    let finalTranscript = transcript || '';
+
+    // If local Whisper was not used, we need to transcribe using Gemini
+    if (!useLocalWhisper && audio) {
+      console.log('[InvestigationReport] Using Gemini for audio transcription');
+      
+      // Determine MIME type from file extension
+      const mimeType = audioFileName.endsWith('.wav') ? 'audio/wav' 
+                     : audioFileName.endsWith('.m4a') ? 'audio/mp4'
+                     : 'audio/mpeg';
+
+      const transcriptResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: audio
+                  }
+                },
+                {
+                  text: 'Transkripsi audio ini ke Bahasa Indonesia. Tulis hanya hasil transkripsi tanpa tambahan komentar.'
+                }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 4000,
+            }
+          })
+        }
+      );
+
+      if (!transcriptResponse.ok) {
+        const errorText = await transcriptResponse.text();
+        console.error('[InvestigationReport] Gemini transcription error:', errorText);
+        throw new Error(`Gemini transcription error: ${transcriptResponse.status}`);
+      }
+
+      const transcriptResult = await transcriptResponse.json();
+      finalTranscript = transcriptResult.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      console.log('[InvestigationReport] Transcript generated, length:', finalTranscript.length);
+    }
+
+    if (!finalTranscript || finalTranscript.length < 50) {
+      throw new Error('Transcript terlalu pendek atau tidak valid (minimum 50 karakter)');
+    }
     
-    console.log('[InvestigationReport] Generating report for transcript length:', transcript.length);
+    console.log('[InvestigationReport] Generating report for transcript length:', finalTranscript.length);
     
     // Comprehensive investigation report prompt
-    const prompt = `Anda adalah AI investigator keselamatan kerja mining & marine operations. Tugas Anda adalah membuat laporan investigasi kecelakaan lengkap berdasarkan transcript audio wawancara investigasi yang diberikan.
+    const promptText = `Anda adalah AI investigator keselamatan kerja mining & marine operations. Tugas Anda adalah membuat laporan investigasi kecelakaan lengkap berdasarkan transcript audio wawancara investigasi yang diberikan.
 
 === TEMPLATE LAPORAN WAJIB ===
 
@@ -206,9 +264,31 @@ Operational Continuity:
 6. Setiap rekomendasi harus memiliki PIC dan timeline yang jelas
 
 TRANSCRIPT AUDIO UNTUK DIANALISIS:
-${transcript}`;
+${finalTranscript}`;
 
-    // Call Gemini API with comprehensive prompt
+    // Build multimodal request parts
+    const reportParts: any[] = [{ text: promptText }];
+
+    // Add image if provided
+    if (image) {
+      const imageMimeType = imageFileName?.endsWith('.png') ? 'image/png'
+                          : imageFileName?.endsWith('.webp') ? 'image/webp'
+                          : 'image/jpeg';
+
+      reportParts.push({
+        inline_data: {
+          mime_type: imageMimeType,
+          data: image
+        }
+      });
+      reportParts.push({
+        text: '\n\n[INSTRUKSI TAMBAHAN] Foto bukti investigasi di atas menunjukkan kondisi lokasi/equipment. Integrasikan informasi visual ini ke dalam analisis PEEPO dan temuan investigasi. Jelaskan apa yang terlihat di foto dan bagaimana kondisi tersebut berkontribusi pada kejadian.'
+      });
+
+      console.log('[InvestigationReport] Including image evidence in analysis');
+    }
+
+    // Call Gemini API with multimodal prompt
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
       {
@@ -216,7 +296,7 @@ ${transcript}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{
-            parts: [{ text: prompt }]
+            parts: reportParts
           }],
           generationConfig: {
             temperature: 0.3,
@@ -244,7 +324,9 @@ ${transcript}`;
     return new Response(
       JSON.stringify({ 
         report: reportText,
-        generated_at: new Date().toISOString()
+        generated_at: new Date().toISOString(),
+        transcript: finalTranscript,
+        has_image: !!image
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
