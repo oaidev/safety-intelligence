@@ -115,10 +115,11 @@ export function InvestigationReportDisplay({
                   <Edit className="h-4 w-4 mr-1" />
                   Edit
                 </Button>
-                <Button size="sm" onClick={downloadPDF}>
+                {/* Temporarily hidden - Export PDF functionality */}
+                {/* <Button size="sm" onClick={downloadPDF}>
                   <Download className="h-4 w-4 mr-1" />
                   Export PDF
-                </Button>
+                </Button> */}
               </>
             )}
           </div>
