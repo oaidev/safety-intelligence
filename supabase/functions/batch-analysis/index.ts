@@ -15,6 +15,11 @@ interface BatchAnalysisRequest {
     retrievedContext: string;
     promptTemplate: string;
   }[];
+  modelConfig?: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+  };
 }
 
 interface BatchAnalysisResponse {
@@ -38,12 +43,16 @@ serve(async (req) => {
   }
 
   try {
-    const { hazardDescription, analyses }: BatchAnalysisRequest = await req.json();
+    const { hazardDescription, analyses, modelConfig }: BatchAnalysisRequest = await req.json();
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     
     if (!geminiApiKey) {
       throw new Error('GEMINI_API_KEY not found');
     }
+
+    const model = modelConfig?.model || 'gemini-2.5-flash-lite';
+    const temperature = modelConfig?.temperature || 0.1;
+    const maxTokens = modelConfig?.maxTokens || 3072;
 
     console.log(`[BatchAnalysis] Processing batch analysis for ${analyses.length} knowledge bases`);
     const startTime = Date.now();
@@ -83,7 +92,7 @@ serve(async (req) => {
         // Step 2: Call Gemini API
         const step2Start = Date.now();
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
           {
             method: 'POST',
             headers: {
@@ -96,8 +105,8 @@ serve(async (req) => {
                 },
               ],
               generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 3072,
+                temperature: temperature,
+                maxOutputTokens: maxTokens,
               },
             }),
           }
@@ -109,12 +118,17 @@ serve(async (req) => {
           description: 'Mengirim prompt ke Gemini untuk dianalisis',
           duration: Date.now() - step2Start,
           details: {
-            model: 'gemini-2.5-flash-lite',
-            temperature: 0.1,
-            maxOutputTokens: 3072,
+            model: model,
+            temperature: temperature,
+            maxOutputTokens: maxTokens,
             status: response.ok ? 'success' : 'error',
             statusCode: response.status,
-            explanation: 'Request dikirim ke Google Gemini API. Model akan membaca prompt dan mengembalikan analysis dalam format KATEGORI, CONFIDENCE, dan ALASAN.'
+            explanation: 'Request dikirim ke Google Gemini API. Model akan membaca prompt dan mengembalikan analysis dalam format KATEGORI, CONFIDENCE, dan ALASAN.',
+            configUsed: {
+              model: model,
+              temperature: temperature,
+              maxOutputTokens: maxTokens
+            }
           },
           status: response.ok ? 'success' : 'error'
         });

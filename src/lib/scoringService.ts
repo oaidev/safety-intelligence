@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { configService } from './configService';
 
 export interface ScoreData {
   consistency: number;
@@ -67,6 +68,19 @@ export class ScoringService {
   async analyzeHazardQuality(formData: HazardFormData): Promise<AnalysisResult> {
     const startTime = Date.now();
     const thinkingSteps: ThinkingStep[] = [];
+
+    // Load configurations
+    const configs = await configService.getMultiple([
+      'scoring_model',
+      'scoring_temperature',
+      'scoring_weights'
+    ]);
+
+    const scoringWeights = configs.scoring_weights || {
+      consistency: 0.33,
+      completeness: 0.33,
+      image_relevance: 0.34
+    };
     
     try {
       console.log('[ScoringService] Starting hazard quality analysis...');
@@ -109,22 +123,27 @@ export class ScoringService {
           criteria: [
             {
               name: 'Consistency',
-              weight: '33.3%',
+              weight: `${(scoringWeights.consistency * 100).toFixed(0)}%`,
               description: 'Konsistensi antara deskripsi temuan, kategori ketidaksesuaian, dan quick action'
             },
             {
               name: 'Completeness',
-              weight: '33.3%',
+              weight: `${(scoringWeights.completeness * 100).toFixed(0)}%`,
               description: 'Kelengkapan informasi (lokasi detail, tools pengamatan, deskripsi yang jelas)'
             },
             {
               name: 'Image Relevance',
-              weight: '33.3%',
+              weight: `${(scoringWeights.image_relevance * 100).toFixed(0)}%`,
               description: 'Relevansi foto dengan deskripsi hazard (jika ada foto)'
             }
           ],
-          model: 'gemini-2.5-flash',
-          explanation: '🤖 AI membaca semua field dan memberi score 0-100 untuk setiap kriteria. Setiap kriteria memiliki bobot yang sama dalam perhitungan overall score.'
+          model: configs.scoring_model || 'gemini-2.5-flash',
+          explanation: '🤖 AI membaca semua field dan memberi score 0-100 untuk setiap kriteria. Setiap kriteria memiliki bobot yang sama dalam perhitungan overall score.',
+          configUsed: {
+            model: configs.scoring_model || 'gemini-2.5-flash',
+            temperature: configs.scoring_temperature || 0.3,
+            weights: scoringWeights
+          }
         },
         status: error ? 'error' : 'success'
       });
@@ -155,11 +174,14 @@ export class ScoringService {
             completeness: analysis.scores.completeness,
             image_relevance: analysis.scores.image_relevance
           },
-          formula: '(Consistency + Completeness + Image Relevance) / 3',
+          formula: `(Consistency × ${(scoringWeights.consistency * 100).toFixed(0)}% + Completeness × ${(scoringWeights.completeness * 100).toFixed(0)}% + Image × ${(scoringWeights.image_relevance * 100).toFixed(0)}%)`,
           calculation: `(${analysis.scores.consistency} + ${analysis.scores.completeness} + ${analysis.scores.image_relevance}) / 3 = ${analysis.scores.overall}`,
           overall: analysis.scores.overall,
           grade: this.getScoreGrade(analysis.scores.overall),
-          explanation: '📊 Overall score dihitung sebagai rata-rata sederhana dari 3 kriteria. Score 80+ = Excellent, 60-79 = Good, 40-59 = Fair, <40 = Poor.'
+          explanation: '📊 Overall score dihitung sebagai rata-rata sederhana dari 3 kriteria. Score 80+ = Excellent, 60-79 = Good, 40-59 = Fair, <40 = Poor.',
+          configUsed: {
+            weights: scoringWeights
+          }
         },
         status: 'success'
       });

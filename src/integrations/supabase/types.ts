@@ -383,6 +383,54 @@ export type Database = {
         }
         Relationships: []
       }
+      system_configurations: {
+        Row: {
+          category: string
+          created_at: string | null
+          default_value: Json
+          description: string | null
+          id: string
+          is_visible: boolean | null
+          max_value: number | null
+          min_value: number | null
+          name: string
+          unit: string | null
+          updated_at: string | null
+          value: Json
+          value_type: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          default_value: Json
+          description?: string | null
+          id: string
+          is_visible?: boolean | null
+          max_value?: number | null
+          min_value?: number | null
+          name: string
+          unit?: string | null
+          updated_at?: string | null
+          value: Json
+          value_type: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          default_value?: Json
+          description?: string | null
+          id?: string
+          is_visible?: boolean | null
+          max_value?: number | null
+          min_value?: number | null
+          name?: string
+          unit?: string | null
+          updated_at?: string | null
+          value?: Json
+          value_type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

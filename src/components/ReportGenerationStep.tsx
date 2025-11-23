@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Download, Edit, RefreshCw, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { configService } from '@/lib/configService';
 import { Textarea } from '@/components/ui/textarea';
 import { ThinkingProcessViewer, ThinkingStep, ThinkingProcess } from './ThinkingProcessViewer';
 
@@ -39,6 +40,13 @@ const ReportGenerationStep = ({
     const steps: ThinkingStep[] = [];
 
     try {
+      // Load configurations
+      const configs = await configService.getMultiple([
+        'investigation_model',
+        'investigation_temperature',
+        'investigation_max_tokens'
+      ]);
+
       // Step 1: Validate transcript
       const step1Start = Date.now();
       const wordCount = transcript.split(/\s+/).length;
@@ -79,12 +87,17 @@ const ReportGenerationStep = ({
         timestamp: step2Start,
         duration: Date.now() - step2Start,
         details: {
-          model: 'gemini-2.0-flash',
-          temperature: 0.3,
-          maxTokens: 8000,
+          model: configs.investigation_model || 'gemini-2.0-flash',
+          temperature: configs.investigation_temperature || 0.3,
+          maxTokens: configs.investigation_max_tokens || 8000,
           transcriptLength: transcript.length,
           explanation: '🤖 Gemini AI membaca seluruh transcript audio dan mengekstrak informasi penting untuk membuat laporan investigasi terstruktur dengan 5W+1H (What, Who, When, Where, Why, How).',
-          error: error ? error.message : undefined
+          error: error ? error.message : undefined,
+          configUsed: {
+            model: configs.investigation_model || 'gemini-2.0-flash',
+            temperature: configs.investigation_temperature || 0.3,
+            maxTokens: configs.investigation_max_tokens || 8000
+          }
         },
         status: error ? 'error' : 'success'
       });

@@ -221,14 +221,26 @@ export function KnowledgeBaseList() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="prompt">Prompt Template</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="prompt">Prompt Template</Label>
+                  <Badge variant="outline" className="text-xs">
+                    Use {'{RETRIEVED_CONTEXT}'} and {'{USER_INPUT}'}
+                  </Badge>
+                </div>
                 <Textarea
                   id="prompt"
                   placeholder="Enter the AI prompt template with {RETRIEVED_CONTEXT} and {USER_INPUT} placeholders"
                   value={formData.prompt_template}
                   onChange={(e) => setFormData({ ...formData, prompt_template: e.target.value })}
-                  rows={8}
+                  rows={12}
+                  className="font-mono text-sm"
                 />
+                {!formData.prompt_template.includes('{RETRIEVED_CONTEXT}') && formData.prompt_template && (
+                  <p className="text-xs text-warning">⚠️ Missing {'{RETRIEVED_CONTEXT}'} placeholder</p>
+                )}
+                {!formData.prompt_template.includes('{USER_INPUT}') && formData.prompt_template && (
+                  <p className="text-xs text-warning">⚠️ Missing {'{USER_INPUT}'} placeholder</p>
+                )}
               </div>
             </div>
 

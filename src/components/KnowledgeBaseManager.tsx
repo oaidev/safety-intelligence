@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, Upload, FileText, Settings } from 'lucide-react';
+import { Database, Upload, Settings } from 'lucide-react';
 import { KnowledgeBaseList } from './KnowledgeBaseList';
 import { BulkUploadForm } from './BulkUploadForm';
-import { PromptTemplateEditor } from './PromptTemplateEditor';
+import { SystemParametersEditor } from './SystemParametersEditor';
 
 export function KnowledgeBaseManager() {
   return (
@@ -19,9 +18,9 @@ export function KnowledgeBaseManager() {
             <Upload className="h-4 w-4" />
             Bulk Upload
           </TabsTrigger>
-          <TabsTrigger value="prompts" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Edit Prompts
+          <TabsTrigger value="system" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            System Parameters
           </TabsTrigger>
         </TabsList>
 
@@ -59,19 +58,19 @@ export function KnowledgeBaseManager() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="prompts" className="mt-6">
+        <TabsContent value="system" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-info" />
-                Prompt Template Editor
+                <Settings className="h-5 w-5 text-primary" />
+                System Parameters
               </CardTitle>
               <CardDescription>
-                Customize the AI analysis prompts for each knowledge base. Use placeholders for dynamic content.
+                Configure calculation parameters, AI models, and thresholds for the entire system
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <PromptTemplateEditor />
+              <SystemParametersEditor />
             </CardContent>
           </Card>
         </TabsContent>

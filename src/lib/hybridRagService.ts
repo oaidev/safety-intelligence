@@ -1,6 +1,8 @@
 // Hybrid RAG Service with Google Gemini and Client-side Embeddings
 import { pipeline } from '@huggingface/transformers';
 import { supabase } from '@/integrations/supabase/client';
+import type { ThinkingStep, ThinkingProcess } from './scoringService';
+import { configService } from './configService';
 import { KNOWLEDGE_BASES } from './knowledgeBase';
 
 export type EmbeddingProvider = 'google' | 'client-side';
@@ -10,22 +12,6 @@ export interface DocumentChunk {
   text: string;
   similarity?: number;
   knowledgeBaseId: string;
-}
-
-export interface ThinkingStep {
-  step: number;
-  name: string;
-  description: string;
-  timestamp: number;
-  duration: number;
-  details: any;
-  status: 'success' | 'error' | 'warning';
-}
-
-export interface ThinkingProcess {
-  steps: ThinkingStep[];
-  totalDuration: number;
-  summary: string;
 }
 
 export interface AnalysisResult {
@@ -416,10 +402,20 @@ class HybridRagService {
       
       console.log(`[HybridRAG] Generated query embedding using ${this.currentProvider}`);
 
+      // Load AI configurations
+      const configs = await configService.getMultiple([
+        'rag_top_k',
+        'rag_model',
+        'rag_temperature',
+        'rag_max_tokens'
+      ]);
+
+      const topK = configs.rag_top_k || 3;
+
       // Step 3: Retrieve Context (Vector Similarity Search)
       const step3Start = Date.now();
       const contextPromises = Object.keys(KNOWLEDGE_BASES).map(async (kbId) => {
-        const context = await this.retrieveContext(queryEmbedding, kbId, 3);
+        const context = await this.retrieveContext(queryEmbedding, kbId, topK);
         return {
           knowledgeBaseId: kbId,
           context,
@@ -431,12 +427,12 @@ class HybridRagService {
       thinkingSteps.push({
         step: 3,
         name: 'Pencarian Similarity (Vector Search)',
-        description: 'Mencari 3 dokumen paling relevan dari setiap knowledge base',
+        description: `Mencari ${topK} dokumen paling relevan dari setiap knowledge base`,
         timestamp: step3Start,
         duration: Date.now() - step3Start,
         details: {
           totalKnowledgeBases: Object.keys(KNOWLEDGE_BASES).length,
-          topK: 3,
+          topK: topK,
           retrievedChunks: contextResults.map(r => ({
             kb: KNOWLEDGE_BASES[r.knowledgeBaseId].name,
             chunks: r.context.length,
@@ -445,7 +441,10 @@ class HybridRagService {
               : '0',
             topChunkPreview: r.context[0]?.text.substring(0, 100) + '...' || 'No context found'
           })),
-          explanation: '🔍 Sistem menghitung cosine similarity antara query embedding Anda dan setiap document embedding di database. Semakin tinggi score similarity (mendekati 1.0), semakin relevan dokumen tersebut.'
+          explanation: '🔍 Sistem menghitung cosine similarity antara query embedding Anda dan setiap document embedding di database. Semakin tinggi score similarity (mendekati 1.0), semakin relevan dokumen tersebut.',
+          configUsed: {
+            topK: topK
+          }
         },
         status: 'success'
       });
