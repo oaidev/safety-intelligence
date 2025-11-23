@@ -23,16 +23,16 @@ serve(async (req) => {
   try {
     const { audio, audioFileName, image, imageFileName, transcript, useLocalWhisper } = await req.json() as InvestigationReportRequest;
     
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!geminiApiKey) {
-      throw new Error('GEMINI_API_KEY not configured');
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!lovableApiKey) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
     let finalTranscript = transcript || '';
 
-    // If local Whisper was not used, we need to transcribe using Gemini
+    // If local Whisper was not used, we need to transcribe using Lovable AI (Gemini)
     if (!useLocalWhisper && audio) {
-      console.log('[InvestigationReport] Using Gemini for audio transcription');
+      console.log('[InvestigationReport] Using Lovable AI (Gemini) for audio transcription');
       
       // Determine MIME type from file extension
       const mimeType = audioFileName.endsWith('.wav') ? 'audio/wav' 
@@ -40,40 +40,54 @@ serve(async (req) => {
                      : 'audio/mpeg';
 
       const transcriptResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+        'https://ai.gateway.lovable.dev/v1/chat/completions',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Authorization': `Bearer ${lovableApiKey}`,
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: audio
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Transkripsi audio ini ke Bahasa Indonesia. Tulis hanya hasil transkripsi tanpa tambahan komentar.'
+                  },
+                  {
+                    type: 'input_audio',
+                    input_audio: {
+                      data: audio,
+                      format: mimeType.split('/')[1]
+                    }
                   }
-                },
-                {
-                  text: 'Transkripsi audio ini ke Bahasa Indonesia. Tulis hanya hasil transkripsi tanpa tambahan komentar.'
-                }
-              ]
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 4000,
-            }
+                ]
+              }
+            ],
+            max_tokens: 4000,
+            temperature: 0.1
           })
         }
       );
 
       if (!transcriptResponse.ok) {
         const errorText = await transcriptResponse.text();
-        console.error('[InvestigationReport] Gemini transcription error:', errorText);
-        throw new Error(`Gemini transcription error: ${transcriptResponse.status}`);
+        console.error('[InvestigationReport] Lovable AI transcription error:', errorText);
+        
+        if (transcriptResponse.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again in a few moments.');
+        }
+        if (transcriptResponse.status === 402) {
+          throw new Error('Payment required. Please add credits to your Lovable AI workspace.');
+        }
+        throw new Error(`AI transcription error: ${transcriptResponse.status}`);
       }
 
       const transcriptResult = await transcriptResponse.json();
-      finalTranscript = transcriptResult.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      finalTranscript = transcriptResult.choices?.[0]?.message?.content || '';
       console.log('[InvestigationReport] Transcript generated, length:', finalTranscript.length);
     }
 
@@ -266,8 +280,13 @@ Operational Continuity:
 TRANSCRIPT AUDIO UNTUK DIANALISIS:
 ${finalTranscript}`;
 
-    // Build multimodal request parts
-    const reportParts: any[] = [{ text: promptText }];
+    // Build message content with text and optional image
+    const messageContent: any[] = [
+      {
+        type: 'text',
+        text: promptText
+      }
+    ];
 
     // Add image if provided
     if (image) {
@@ -275,45 +294,54 @@ ${finalTranscript}`;
                           : imageFileName?.endsWith('.webp') ? 'image/webp'
                           : 'image/jpeg';
 
-      reportParts.push({
-        inline_data: {
-          mime_type: imageMimeType,
-          data: image
+      messageContent.push({
+        type: 'image_url',
+        image_url: {
+          url: `data:${imageMimeType};base64,${image}`
         }
-      });
-      reportParts.push({
-        text: '\n\n[INSTRUKSI TAMBAHAN] Foto bukti investigasi di atas menunjukkan kondisi lokasi/equipment. Integrasikan informasi visual ini ke dalam analisis PEEPO dan temuan investigasi. Jelaskan apa yang terlihat di foto dan bagaimana kondisi tersebut berkontribusi pada kejadian.'
       });
 
       console.log('[InvestigationReport] Including image evidence in analysis');
     }
 
-    // Call Gemini API with multimodal prompt
+    // Call Lovable AI (Gemini) with multimodal prompt
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      'https://ai.gateway.lovable.dev/v1/chat/completions',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
-          contents: [{
-            parts: reportParts
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 8000,
-          }
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'user',
+              content: messageContent
+            }
+          ],
+          max_tokens: 8000,
+          temperature: 0.3
         })
       }
     );
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[InvestigationReport] Gemini API error:', errorText);
-      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+      console.error('[InvestigationReport] Lovable AI error:', errorText);
+      
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again in a few moments.');
+      }
+      if (response.status === 402) {
+        throw new Error('Payment required. Please add credits to your Lovable AI workspace.');
+      }
+      throw new Error(`AI generation error: ${response.status}`);
     }
     
     const result = await response.json();
-    const reportText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const reportText = result.choices?.[0]?.message?.content || '';
     
     if (!reportText) {
       throw new Error('Gemini tidak mengembalikan report text');
