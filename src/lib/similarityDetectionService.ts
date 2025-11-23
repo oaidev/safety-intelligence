@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { configService } from './configService';
 
 export interface SimilarHazardData {
   id: string;
@@ -35,6 +36,29 @@ class SimilarityDetectionService {
    */
   async checkSimilarHazards(submissionData: HazardSubmissionData): Promise<SimilarHazardData[]> {
     try {
+      // Load configurations from database
+      const configs = await configService.getMultiple([
+        'similarity_time_window',
+        'similarity_location_radius',
+        'similarity_threshold',
+        'similarity_top_n',
+        'similarity_weights'
+      ]);
+
+      const timeWindowDays = configs.similarity_time_window || 7;
+      const locationRadiusKm = configs.similarity_location_radius || 1.0;
+      const similarityThreshold = configs.similarity_threshold || 0.7;
+      const topN = configs.similarity_top_n || 5;
+      const weights = configs.similarity_weights || {
+        location_radius: 0.22,
+        location_name: 0.18,
+        detail_location: 0.14,
+        location_description: 0.09,
+        non_compliance: 0.14,
+        sub_non_compliance: 0.09,
+        finding_description: 0.14
+      };
+
       const lat = parseFloat(submissionData.latitude || '0');
       const lng = parseFloat(submissionData.longitude || '0');
       const hasValidCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
@@ -47,7 +71,9 @@ class SimilarityDetectionService {
         hasValidCoords
       });
 
-      // Base query for similar hazards in the last 7 days
+      const startDate = new Date(Date.now() - timeWindowDays * 24 * 60 * 60 * 1000);
+
+      // Base query for similar hazards
       let query = supabase
         .from('hazard_reports')
         .select(`
@@ -65,7 +91,7 @@ class SimilarityDetectionService {
           latitude,
           longitude
         `)
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', startDate.toISOString());
 
       // Add location-based filtering if coordinates are provided
       if (hasValidCoords) {
@@ -113,80 +139,79 @@ class SimilarityDetectionService {
           
           console.log('Distance result:', { distance_km: distanceKm });
 
-          if (distanceKm <= 1.0) {
-            locationRadiusScore = 0.22;
-            similarityScore += 0.22;
-            console.log('✅ Location radius match: +0.22');
+          if (distanceKm <= locationRadiusKm) {
+            locationRadiusScore = weights.location_radius;
+            similarityScore += weights.location_radius;
+            console.log(`✅ Location radius match: +${weights.location_radius}`);
           } else {
-            console.log(`❌ Distance too far: ${distanceKm}km > 1km`);
+            console.log(`❌ Distance too far: ${distanceKm}km > ${locationRadiusKm}km`);
           }
         } else {
           console.log('❌ No valid coordinates for radius comparison');
         }
 
-        // 2. Location name exact match - Weight: 0.18
+        // 2. Location name exact match
         let locationNameScore = 0;
         if (this.normalizeText(hazard.location) === this.normalizeText(submissionData.location)) {
-          locationNameScore = 0.18;
-          similarityScore += 0.18;
-          console.log('✅ Location name match: +0.18');
+          locationNameScore = weights.location_name;
+          similarityScore += weights.location_name;
+          console.log(`✅ Location name match: +${weights.location_name}`);
         } else {
           console.log(`❌ Location name mismatch: "${this.normalizeText(hazard.location)}" vs "${this.normalizeText(submissionData.location)}"`);
         }
 
-        // 3. Detail location exact match - Weight: 0.14
+        // 3. Detail location exact match
         let detailLocationScore = 0;
         if (submissionData.detail_location && hazard.detail_location && 
             this.normalizeText(hazard.detail_location) === this.normalizeText(submissionData.detail_location)) {
-          detailLocationScore = 0.14;
-          similarityScore += 0.14;
-          console.log('✅ Detail location match: +0.14');
+          detailLocationScore = weights.detail_location;
+          similarityScore += weights.detail_location;
+          console.log(`✅ Detail location match: +${weights.detail_location}`);
         } else {
           console.log(`❌ Detail location mismatch: "${hazard.detail_location}" vs "${submissionData.detail_location}"`);
         }
 
-        // 4. Location description semantic similarity - Weight: 0.09
+        // 4. Location description semantic similarity
         let locationDescriptionScore = 0;
         if (submissionData.location_description && hazard.location_description) {
           const descSimilarity = this.calculateTextSimilarity(
             this.normalizeText(submissionData.location_description),
             this.normalizeText(hazard.location_description)
           );
-          locationDescriptionScore = descSimilarity * 0.09;
+          locationDescriptionScore = descSimilarity * weights.location_description;
           similarityScore += locationDescriptionScore;
           console.log(`✅ Location description similarity: +${locationDescriptionScore.toFixed(3)} (${(descSimilarity * 100).toFixed(1)}% match)`);
         } else {
           console.log('❌ No location description for comparison');
         }
 
-        // 5. Non-compliance exact match - Weight: 0.14
+        // 5. Non-compliance exact match
         let nonComplianceScore = 0;
         if (this.normalizeText(hazard.non_compliance) === this.normalizeText(submissionData.non_compliance)) {
-          nonComplianceScore = 0.14;
-          similarityScore += 0.14;
-          console.log('✅ Non-compliance match: +0.14');
+          nonComplianceScore = weights.non_compliance;
+          similarityScore += weights.non_compliance;
+          console.log(`✅ Non-compliance match: +${weights.non_compliance}`);
         } else {
           console.log(`❌ Non-compliance mismatch: "${this.normalizeText(hazard.non_compliance)}" vs "${this.normalizeText(submissionData.non_compliance)}"`);
         }
 
-        // 6. Sub non-compliance exact match - Weight: 0.09
+        // 6. Sub non-compliance exact match
         let subNonComplianceScore = 0;
         if (this.normalizeText(hazard.sub_non_compliance) === this.normalizeText(submissionData.sub_non_compliance)) {
-          subNonComplianceScore = 0.09;
-          similarityScore += 0.09;
-          console.log('✅ Sub non-compliance match: +0.09');
+          subNonComplianceScore = weights.sub_non_compliance;
+          similarityScore += weights.sub_non_compliance;
+          console.log(`✅ Sub non-compliance match: +${weights.sub_non_compliance}`);
         } else {
           console.log(`❌ Sub non-compliance mismatch: "${this.normalizeText(hazard.sub_non_compliance)}" vs "${this.normalizeText(submissionData.sub_non_compliance)}"`);
         }
 
-        // 7. Finding description semantic similarity - Weight: 0.14
-        // Extract just the description from stored format if it contains "Deskripsi Temuan:"
+        // 7. Finding description semantic similarity
         const extractedDescription = this.extractDescriptionFromStored(hazard.finding_description);
         const descriptionSimilarity = this.calculateTextSimilarity(
           submissionData.finding_description,
           extractedDescription
         );
-        const descriptionScore = descriptionSimilarity * 0.14;
+        const descriptionScore = descriptionSimilarity * weights.finding_description;
         similarityScore += descriptionScore;
         
         console.log('Description comparison:', {
@@ -207,8 +232,8 @@ class SimilarityDetectionService {
 
         console.log(`Final similarity score: ${similarityScore} (${(similarityScore * 100).toFixed(1)}%)`);
 
-        // Only include if similarity score is above threshold (0.7)
-        if (similarityScore >= 0.7) {
+        // Only include if similarity score is above threshold
+        if (similarityScore >= similarityThreshold) {
           similarHazards.push({
             ...hazard,
             distance_km: distanceKm,
@@ -223,7 +248,7 @@ class SimilarityDetectionService {
           return (b.similarity_score || 0) - (a.similarity_score || 0);
         }
         return (a.distance_km || 999) - (b.distance_km || 999);
-      }).slice(0, 5); // Return top 5 most similar
+      }).slice(0, topN);
 
     } catch (error) {
       console.error('Error in similarity detection:', error);
