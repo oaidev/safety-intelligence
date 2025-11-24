@@ -431,6 +431,48 @@ export type Database = {
         }
         Relationships: []
       }
+      system_prompts: {
+        Row: {
+          category: string
+          created_at: string
+          default_template: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          placeholders: Json
+          prompt_template: string
+          updated_at: string
+          validation_rules: Json
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          default_template: string
+          description?: string | null
+          id: string
+          is_active?: boolean
+          name: string
+          placeholders?: Json
+          prompt_template: string
+          updated_at?: string
+          validation_rules?: Json
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          default_template?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          placeholders?: Json
+          prompt_template?: string
+          updated_at?: string
+          validation_rules?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

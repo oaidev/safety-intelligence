@@ -123,53 +123,22 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY not configured');
     }
 
-    const simplifiedPrompt = `Anda adalah ahli HIRA (Hazard Identification and Risk Assessment) yang berpengalaman. Berikan analisis HIRA dalam format yang sederhana dan terstruktur.
+    // Fetch prompt template from database
+    const { data: promptData, error: promptError } = await supabase.functions.invoke('get-system-prompt', {
+      body: { prompt_id: 'comprehensive-hira' }
+    });
 
-INFORMASI HAZARD:
-- Deskripsi: ${hazard_description}
-- Lokasi: ${location}
-- Ketidaksesuaian: ${non_compliance}
-
-KONTEKS HIRA KNOWLEDGE BASE:
-${hiraContext || 'Tidak ada konteks HIRA yang relevan ditemukan'}
-
-Berikan respons dalam format JSON yang valid dengan struktur berikut:
-
-{
-  "confidence": 0.85,
-  "rootCauseAnalysis": {
-    "hazardCategory": "kategori bahaya utama",
-    "environmentalAspect": "aspek lingkungan yang terkait",
-    "potentialCause": "penyebab potensial spesifik",
-    "fullDescription": "deskripsi lengkap dalam format: [hazardCategory] / [environmentalAspect] / [potentialCause] menyebabkan [dampak]"
-  },
-  "correctiveActions": [
-    {
-      "controlType": "Administrasi",
-      "controlLevel": "Preventive",
-      "actions": [
-        "Memastikan operator unit fit untuk bekerja sesuai dengan prosedur fatigue management melalui form fit to work",
-        "Pengawas melakukan komunikasi kontak positif dengan operator",
-        "Menghentikan kegiatan operator jika terdapat tanda tanda kelelahan/fatique sesuai prosedur Pengelolaan Kelelahan (fatigue management)"
-      ]
-    },
-    {
-      "controlType": "Administrasi",
-      "controlLevel": "Detective",
-      "actions": [
-        "Pengawas melakukan observasi operator saat bekerja"
-      ]
+    if (promptError || !promptData?.prompt_template) {
+      console.error('Failed to fetch prompt template, using fallback');
+      throw new Error('Prompt template not available');
     }
-  ]
-}
 
-PENTING:
-1. Berikan respons HANYA dalam format JSON yang valid
-2. Gunakan bahasa Indonesia yang profesional dan spesifik sesuai konteks industri pertambangan
-3. controlType harus salah satu dari: "Eliminasi", "Substitusi", "Engineering", "Administrasi"
-4. controlLevel harus salah satu dari: "Preventive", "Detective", "Mitigative"
-5. Bisa ada multiple groups dengan tipe dan level yang berbeda
-6. fullDescription harus menjelaskan akar permasalahan secara lengkap dengan format "[Bahaya] / [Aspek Lingkungan] / [Penyebab Potensial] menyebabkan [dampak]"`;
+    // Replace placeholders with actual data
+    const simplifiedPrompt = promptData.prompt_template
+      .replace('{HAZARD_DESCRIPTION}', hazard_description)
+      .replace('{LOCATION}', location)
+      .replace('{NON_COMPLIANCE}', non_compliance)
+      .replace('{HIRA_CONTEXT}', hiraContext || 'Tidak ada konteks HIRA yang relevan ditemukan');
 
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
