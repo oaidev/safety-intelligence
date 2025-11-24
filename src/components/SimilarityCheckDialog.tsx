@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, MapPin, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
+import { ThinkingProcessViewer, ThinkingProcess } from '@/components/ThinkingProcessViewer';
 
 interface SimilarHazard {
   id: string;
@@ -27,6 +28,7 @@ interface SimilarityCheckDialogProps {
   similarHazards: SimilarHazard[];
   onContinueSubmission: () => void;
   onEditForm: () => void;
+  thinkingProcess?: ThinkingProcess;
 }
 
 export function SimilarityCheckDialog({
@@ -34,7 +36,8 @@ export function SimilarityCheckDialog({
   onOpenChange,
   similarHazards,
   onContinueSubmission,
-  onEditForm
+  onEditForm,
+  thinkingProcess
 }: SimilarityCheckDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -73,6 +76,13 @@ export function SimilarityCheckDialog({
             Silakan review terlebih dahulu apakah hazard ini sudah pernah dilaporkan.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Thinking Process Viewer */}
+        {thinkingProcess && (
+          <div className="mb-4">
+            <ThinkingProcessViewer thinkingProcess={thinkingProcess} compact={true} />
+          </div>
+        )}
 
         <div className="space-y-4">
           {similarHazards.map((hazard, index) => (
