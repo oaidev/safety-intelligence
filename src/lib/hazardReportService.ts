@@ -107,7 +107,7 @@ export class HazardReportService {
     // Post-save similarity clustering (for analytics only, not for pre-submission detection)
     if (!formData.isDuplicate) {
       try {
-        const similarReports = await similarityService.findSimilarReports({
+        const similarResult = await similarityService.findSimilarReports({
           id: savedReport.id,
           tracking_id: savedReport.tracking_id,
           reporter_name: formData.reporterName,
@@ -119,11 +119,11 @@ export class HazardReportService {
           created_at: savedReport.created_at,
         });
 
-        if (similarReports.length > 0) {
-          console.log(`[HazardReportService] Found ${similarReports.length} similar reports for clustering`);
+        if (similarResult.reports.length > 0) {
+          console.log(`[HazardReportService] Found ${similarResult.reports.length} similar reports for clustering`);
           
           // Create a cluster including the current report
-          const allReports = [...similarReports, { 
+          const allReports = [...similarResult.reports, {
             id: savedReport.id,
             tracking_id: savedReport.tracking_id,
             reporter_name: formData.reporterName,
@@ -356,14 +356,14 @@ export class HazardReportService {
       }
       
       const reportsData = reports || [];
-      const painPoints = await similarityService.getPainPoints();
+      const painPointsResult = await similarityService.getPainPoints();
       
       return {
         total_reports: reportsData.length,
         pending_review: reportsData.filter(r => r.status === 'PENDING_REVIEW').length,
         in_progress: reportsData.filter(r => r.status === 'IN_PROGRESS').length,
         completed: reportsData.filter(r => r.status === 'COMPLETED').length,
-        pain_points: painPoints.length,
+        pain_points: painPointsResult.clusters.length,
       };
     } catch (error) {
       console.error('[HazardReportService] Error fetching stats:', error);

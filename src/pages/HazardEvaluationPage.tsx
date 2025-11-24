@@ -15,6 +15,7 @@ import { hazardReportService } from '@/lib/hazardReportService';
 import { hiraRecommendationService } from '@/lib/hiraRecommendationService';
 import { ComprehensiveRecommendationDisplay } from '@/components/ComprehensiveRecommendationDisplay';
 import { SimilarReportsAnalysis } from '@/components/SimilarReportsAnalysis';
+import { ThinkingProcessViewer, type ThinkingProcess } from '@/components/ThinkingProcessViewer';
 import { 
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -88,6 +89,7 @@ export default function HazardEvaluationPage() {
   const [dueDate, setDueDate] = useState<Date>();
   const [comprehensiveRecommendations, setComprehensiveRecommendations] = useState<any>(null);
   const [showComprehensive, setShowComprehensive] = useState(false);
+  const [recommendationThinking, setRecommendationThinking] = useState<ThinkingProcess | null>(null);
 
   const [evaluationData, setEvaluationData] = useState({
     kategori_temuan: '',
@@ -161,6 +163,8 @@ export default function HazardEvaluationPage() {
         alur_permasalahan: formatted.rootCauses,
         tindakan: formatted.correctiveActions
       }));
+      
+      setRecommendationThinking(formatted.thinkingProcess);
 
       toast({
         title: formatted.source === 'hira' ? 'HIRA Recommendation' : 'AI Recommendation',
@@ -523,6 +527,11 @@ export default function HazardEvaluationPage() {
                     )}
                   </Button>
                 </div>
+                
+                {recommendationThinking && (
+                  <ThinkingProcessViewer thinkingProcess={recommendationThinking} compact={true} />
+                )}
+                
                 <Textarea
                   value={evaluationData.alur_permasalahan}
                   onChange={(e) => setEvaluationData(prev => ({ ...prev, alur_permasalahan: e.target.value }))}

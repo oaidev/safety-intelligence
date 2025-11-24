@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { ThinkingProcessGenerator } from './thinkingProcessGenerator';
+import type { ThinkingProcess } from '@/components/ThinkingProcessViewer';
 
 interface HiraRecommendation {
   source: 'hira' | 'ai';
@@ -272,17 +274,25 @@ class HiraRecommendationService {
     };
   }
 
-  // New function to get simplified formatted recommendations
+  // New function to get simplified formatted recommendations (with thinking process)
   async getFormattedRecommendations(hazardDescription: string, location: string, nonCompliance: string): Promise<{
     rootCauses: string;
     correctiveActions: string;
     source: 'hira' | 'ai';
     message: string;
+    thinkingProcess: ThinkingProcess;
   }> {
+    const thinking = new ThinkingProcessGenerator();
     try {
       console.log('[HIRA] Getting simplified formatted recommendations for:', hazardDescription.substring(0, 100));
       
+      thinking.addStep(1, 'Inisialisasi', 'Memulai analisis rekomendasi HIRA',
+        `**Non-compliance**: ${nonCompliance}\n**Location**: ${location}`, 'success');
+      
       // Generate embedding on client-side using the same 384-dim model
+      thinking.addStep(2, 'Generate Embedding', 'Membuat vector embedding dari query',
+        'Menggunakan model Xenova/all-MiniLM-L6-v2 (384 dimensi)', 'success');
+      
       const { optimizedRagService } = await import('./optimizedRagService');
       await optimizedRagService.initialize();
       
@@ -290,8 +300,13 @@ class HiraRecommendationService {
       const queryEmbedding = await optimizedRagService.generateEmbedding(queryText);
       
       console.log('[HIRA] Generated client-side embedding:', queryEmbedding.length, 'dimensions');
+      thinking.addStep(3, 'Embedding Generated', 'Vector embedding berhasil dibuat',
+        `**Dimensi**: ${queryEmbedding.length}\n**Query**: ${queryText.substring(0, 100)}...`, 'success');
       
       // Call the edge function for simplified recommendations
+      thinking.addStep(4, 'Call Edge Function', 'Memanggil comprehensive-hira-recommendations',
+        'Mencari rekomendasi dari knowledge base HIRA', 'success');
+      
       const { data, error } = await supabase.functions.invoke('comprehensive-hira-recommendations', {
         body: {
           hazard_description: hazardDescription,
@@ -302,10 +317,13 @@ class HiraRecommendationService {
       });
 
       if (error) {
+        thinking.addStep(5, 'Error', 'Edge function error', error.message, 'error');
         throw error;
       }
 
       if (data.success && data.recommendations) {
+        thinking.addStep(5, 'HIRA Match Found', 'Rekomendasi ditemukan dari knowledge base',
+          `**Source**: ${data.recommendations.source}\n**Strategy**: ${data.strategy || 'unknown'}`, 'success');
         const rec = data.recommendations;
         
         // Format root causes
@@ -329,16 +347,26 @@ class HiraRecommendationService {
         
         console.log('[HIRA] Successfully formatted simplified recommendations');
         
+        thinking.addStep(6, 'Format Rekomendasi', 'Memformat hasil rekomendasi',
+          `**Root causes**: ${rec.rootCauseAnalysis.fullDescription.substring(0, 100)}...\n**Actions**: ${rec.correctiveActions.length} tipe pengendalian`,
+          'success');
+        
         return {
           rootCauses: formattedRootCauses,
           correctiveActions: formattedActions,
           source: rec.source,
-          message: rec.source === 'hira' ? 'Rekomendasi berdasarkan HIRA knowledge base' : 'Rekomendasi AI - silakan sesuaikan dengan kondisi lapangan'
+          message: rec.source === 'hira' ? 'Rekomendasi berdasarkan HIRA knowledge base' : 'Rekomendasi AI - silakan sesuaikan dengan kondisi lapangan',
+          thinkingProcess: thinking.build(
+            `Rekomendasi ${rec.source === 'hira' ? 'HIRA' : 'AI'} berhasil di-generate`,
+            { source: rec.source, confidence: rec.confidence, category: 'recommendations' }
+          )
         };
       }
       
       // Fallback to default format
       console.log('[HIRA] Using fallback format');
+      thinking.addStep(5, 'Fallback', 'Menggunakan format default',
+        'Tidak ada rekomendasi spesifik dari HIRA, menggunakan template default', 'warning');
       
       const formattedRootCauses = `Bahaya/Aspek Lingkungan/Penyebab Potensial
 Kurang konsentrasi dalam melakukan pekerjaan (kelelahan/fatigue) menyebabkan unit menabrak sesuatu`;
@@ -362,17 +390,20 @@ Pengawas melakukan observasi operator saat bekerja`;
         rootCauses: formattedRootCauses,
         correctiveActions: formattedActions,
         source: 'ai',
-        message: 'Rekomendasi AI - silakan sesuaikan dengan kondisi lapangan'
+        message: 'Rekomendasi AI - silakan sesuaikan dengan kondisi lapangan',
+        thinkingProcess: thinking.build('Menggunakan rekomendasi AI fallback', { source: 'ai', category: 'recommendations' })
       };
       
     } catch (error) {
       console.error('[HIRA] Error getting formatted recommendations:', error);
+      thinking.addStep(5, 'Error', 'Terjadi kesalahan', String(error), 'error');
       
       return {
         rootCauses: 'Bahaya/Aspek Lingkungan/Penyebab Potensial\nPerlu investigasi lebih lanjut untuk menentukan akar masalah',
         correctiveActions: 'Tipe Pengendalian : Administrasi\nJenis Pengendalian : Preventive\n\nPengendalian yang dilakukan (sesuai Hirarki)\nImplementasi prosedur keselamatan\nMonitoring dan inspeksi berkala',
         source: 'ai',
-        message: 'Rekomendasi default - silakan sesuaikan dengan kondisi lapangan'
+        message: 'Rekomendasi default - silakan sesuaikan dengan kondisi lapangan',
+        thinkingProcess: thinking.build('Error saat generate rekomendasi', { error: String(error), category: 'recommendations' })
       };
     }
   }
