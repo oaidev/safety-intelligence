@@ -52,24 +52,24 @@ export function ClusterAnalysisDashboard() {
     setIsLoading(true);
     try {
       // Load pain points and timing analytics
-      const [points, timingData] = await Promise.all([
+      const [pointsResult, timingData] = await Promise.all([
         similarityService.getPainPoints(),
         hazardReportService.getTimingAnalytics()
       ]);
       
-      setPainPoints(points);
+      setPainPoints(pointsResult.clusters);
       setTimingAnalytics(timingData);
 
       // Calculate cluster statistics
-      if (points.length > 0) {
-        const totalReports = points.reduce((sum, cluster) => sum + cluster.reports.length, 0);
-        const avgSize = totalReports / points.length;
+      if (pointsResult.clusters.length > 0) {
+        const totalReports = pointsResult.clusters.reduce((sum, cluster) => sum + cluster.reports.length, 0);
+        const avgSize = totalReports / pointsResult.clusters.length;
 
         // Count by location
         const locationCounts: Record<string, number> = {};
         const categoryCounts: Record<string, number> = {};
 
-        points.forEach(cluster => {
+        pointsResult.clusters.forEach(cluster => {
           cluster.reports.forEach(report => {
             locationCounts[report.location] = (locationCounts[report.location] || 0) + 1;
             categoryCounts[report.non_compliance] = (categoryCounts[report.non_compliance] || 0) + 1;
@@ -87,7 +87,7 @@ export function ClusterAnalysisDashboard() {
           .map(([category, count]) => ({ category, count }));
 
         setClusterStats({
-          totalClusters: points.length,
+          totalClusters: pointsResult.clusters.length,
           totalClusteredReports: totalReports,
           averageClusterSize: Math.round(avgSize * 10) / 10,
           topLocations,

@@ -5,11 +5,13 @@ import { InvestigationReportDisplay } from '@/components/InvestigationReportDisp
 import { whisperService } from '@/lib/whisperService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ThinkingProcessViewer, type ThinkingProcess } from '@/components/ThinkingProcessViewer';
 
 const InvestigationReportGenerator = () => {
   const [reportData, setReportData] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [trackingId, setTrackingId] = useState('');
+  const [thinkingProcess, setThinkingProcess] = useState<ThinkingProcess | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,6 +68,11 @@ const InvestigationReportGenerator = () => {
 
       setReportData(data.report);
       setTrackingId(data.tracking_id || '');
+      
+      // Set thinking process if provided
+      if (data.thinkingProcess) {
+        setThinkingProcess(data.thinkingProcess);
+      }
 
       toast({
         title: 'Report generated!',
@@ -118,11 +125,16 @@ const InvestigationReportGenerator = () => {
           {/* Report Display Section */}
           <div>
             {reportData ? (
-              <InvestigationReportDisplay
-                reportData={reportData}
-                trackingId={trackingId}
-                onUpdate={(newReport) => setReportData(newReport)}
-              />
+              <div className="space-y-4">
+                {thinkingProcess && (
+                  <ThinkingProcessViewer thinkingProcess={thinkingProcess} compact={false} />
+                )}
+                <InvestigationReportDisplay
+                  reportData={reportData}
+                  trackingId={trackingId}
+                  onUpdate={(newReport) => setReportData(newReport)}
+                />
+              </div>
             ) : (
               <Card className="p-12 text-center border-dashed min-h-96 flex items-center justify-center">
                 <p className="text-muted-foreground">

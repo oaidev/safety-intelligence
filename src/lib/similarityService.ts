@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { hybridRagService } from "./hybridRagService";
+import { ThinkingProcessGenerator } from "./thinkingProcessGenerator";
+import type { ThinkingProcess } from "@/components/ThinkingProcessViewer";
 
 export interface SimilarityCluster {
   id: string;
@@ -38,13 +40,19 @@ export class SimilarityService {
   }
 
   /**
-   * Find similar reports within the last 7 days
+   * Find similar reports within the last 7 days (with thinking process)
    */
-  async findSimilarReports(currentReport: HazardReport): Promise<HazardReport[]> {
+  async findSimilarReports(currentReport: HazardReport): Promise<{ reports: HazardReport[], thinkingProcess: ThinkingProcess }> {
+    const thinking = new ThinkingProcessGenerator();
     console.log('[SimilarityService] Finding similar reports for:', currentReport.id);
+    
+    thinking.addStep(1, 'Inisialisasi', 'Memulai pencarian laporan serupa', 
+      `**Report ID**: ${currentReport.id}\n**Non-compliance**: ${currentReport.non_compliance}`, 'success');
     
     // Get reports from the last 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    thinking.addStep(2, 'Konfigurasi Time Window', 'Mengatur rentang waktu pencarian',
+      `**Time window**: 7 hari terakhir\n**Dari**: ${sevenDaysAgo.toISOString()}`, 'success');
     
     const { data: recentReports, error } = await supabase
       .from('hazard_reports')
@@ -55,16 +63,24 @@ export class SimilarityService {
 
     if (error) {
       console.error('[SimilarityService] Error fetching recent reports:', error);
-      return [];
+      thinking.addStep(3, 'Error Query', 'Gagal mengambil data', error.message, 'error');
+      return { reports: [], thinkingProcess: thinking.build('Error querying database') };
     }
 
     if (!recentReports || recentReports.length === 0) {
-      return [];
+      thinking.addStep(3, 'Query Database', 'Tidak ada kandidat ditemukan',
+        '**Hasil**: 0 laporan dalam 7 hari terakhir', 'warning');
+      return { reports: [], thinkingProcess: thinking.build('Tidak ada laporan serupa dalam 7 hari terakhir') };
     }
 
     console.log(`[SimilarityService] Found ${recentReports.length} recent reports to compare`);
+    thinking.addStep(3, 'Query Database', 'Berhasil mengambil kandidat',
+      `**Kandidat ditemukan**: ${recentReports.length} laporan\n**Status**: PENDING_REVIEW`, 'success');
 
     // Calculate similarity scores for each report
+    thinking.addStep(4, 'Kalkulasi Similarity', 'Menghitung similarity untuk setiap kandidat',
+      `**Total kandidat**: ${recentReports.length}\n**Method**: Text + Location + Category`, 'success');
+    
     const similarityResults = await Promise.all(
       recentReports.map(async (report) => {
         const similarity = await this.calculateSimilarity(currentReport, report);
@@ -76,13 +92,27 @@ export class SimilarityService {
     );
 
     // Filter reports with similarity > 0.75 and sort by similarity
+    const threshold = 0.75;
+    thinking.addStep(5, 'Filtering', 'Menyaring berdasarkan threshold',
+      `**Threshold**: ${(threshold * 100).toFixed(0)}%\n**Kandidat dianalisis**: ${similarityResults.length}`, 'success');
+    
     const similarReports = similarityResults
-      .filter(({ similarity }) => similarity.total_similarity > 0.75)
+      .filter(({ similarity }) => similarity.total_similarity > threshold)
       .sort((a, b) => b.similarity.total_similarity - a.similarity.total_similarity)
       .map(({ report }) => report);
 
+    thinking.addStep(6, 'Ranking & Hasil', 'Mengurutkan hasil berdasarkan skor',
+      `**Lolos filter**: ${similarReports.length} laporan\n**Tidak lolos**: ${similarityResults.length - similarReports.length}`,
+      similarReports.length > 0 ? 'success' : 'warning');
+
     console.log(`[SimilarityService] Found ${similarReports.length} similar reports`);
-    return similarReports;
+    return { 
+      reports: similarReports, 
+      thinkingProcess: thinking.build(
+        `Ditemukan ${similarReports.length} laporan serupa dari ${recentReports.length} kandidat`,
+        { candidatesAnalyzed: recentReports.length, finalResults: similarReports.length, threshold }
+      )
+    };
   }
 
   /**
@@ -248,9 +278,13 @@ export class SimilarityService {
   }
 
   /**
-   * Get pain points - clusters with 3+ similar reports
+   * Get pain points - clusters with 3+ similar reports (with thinking process)
    */
-  async getPainPoints(): Promise<SimilarityCluster[]> {
+  async getPainPoints(): Promise<{ clusters: SimilarityCluster[], thinkingProcess: ThinkingProcess }> {
+    const thinking = new ThinkingProcessGenerator();
+    thinking.addStep(1, 'Query Database', 'Mengambil semua laporan dengan cluster ID',
+      'Mencari laporan yang sudah dikelompokkan dalam cluster', 'success');
+    
     // Get all reports with cluster IDs
     const { data: reports, error } = await supabase
       .from('hazard_reports')
@@ -259,26 +293,50 @@ export class SimilarityService {
 
     if (error) {
       console.error('[SimilarityService] Error fetching clustered reports:', error);
-      return [];
+      thinking.addStep(2, 'Error', 'Gagal query database', error.message, 'error');
+      return { clusters: [], thinkingProcess: thinking.build('Error fetching clusters') };
     }
 
     if (!reports || reports.length === 0) {
-      return [];
+      thinking.addStep(2, 'Hasil Query', 'Tidak ada cluster ditemukan',
+        '**Total laporan dengan cluster**: 0', 'warning');
+      return { clusters: [], thinkingProcess: thinking.build('Tidak ada pain points terdeteksi') };
     }
+    
+    thinking.addStep(2, 'Hasil Query', 'Berhasil mengambil data cluster',
+      `**Total laporan dengan cluster**: ${reports.length}`, 'success');
 
     // Group by cluster ID and count
+    thinking.addStep(3, 'Grouping', 'Mengelompokkan laporan per cluster ID',
+      'Menghitung jumlah laporan dalam setiap cluster', 'success');
+    
     const clusterCounts = reports.reduce((acc: Record<string, number>, report) => {
       const clusterId = report.similarity_cluster_id!;
       acc[clusterId] = (acc[clusterId] || 0) + 1;
       return acc;
     }, {});
+    
+    const totalClusters = Object.keys(clusterCounts).length;
+    thinking.addStep(4, 'Analisis Cluster', 'Mengidentifikasi unique clusters',
+      `**Total unique clusters**: ${totalClusters}`, 'success');
 
     // Filter clusters with 3+ reports
+    const minClusterSize = 3;
+    thinking.addStep(5, 'Filtering Pain Points', 'Menyaring cluster berdasarkan threshold',
+      `**Minimum size**: ${minClusterSize} laporan\n**Threshold**: Cluster dengan 3+ laporan dianggap pain point`, 'success');
+    
     const painPointClusters = Object.entries(clusterCounts)
-      .filter(([_, count]) => count >= 3)
+      .filter(([_, count]) => count >= minClusterSize)
       .map(([clusterId, _]) => clusterId);
+    
+    thinking.addStep(6, 'Identifikasi Pain Points', 'Hasil filtering pain points',
+      `**Pain points ditemukan**: ${painPointClusters.length}\n**Tidak lolos filter**: ${totalClusters - painPointClusters.length}`,
+      painPointClusters.length > 0 ? 'success' : 'warning');
 
     // Get detailed information for each cluster
+    thinking.addStep(7, 'Fetch Detail Cluster', 'Mengambil detail setiap pain point cluster',
+      `Mengambil semua laporan dalam ${painPointClusters.length} cluster`, 'success');
+    
     const painPoints = await Promise.all(
       painPointClusters.map(async (clusterId) => {
         const reports = await this.getClusterReports(clusterId);
@@ -297,7 +355,18 @@ export class SimilarityService {
       })
     );
 
-    return painPoints;
+    return { 
+      clusters: painPoints, 
+      thinkingProcess: thinking.build(
+        `Teridentifikasi ${painPoints.length} pain points dari ${totalClusters} total cluster`,
+        { 
+          totalClusters, 
+          painPointsFound: painPoints.length,
+          minClusterSize,
+          category: 'pain-point-detection'
+        }
+      )
+    };
   }
 }
 

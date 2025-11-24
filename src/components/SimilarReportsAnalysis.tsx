@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { similarityService, type HazardReport, type SimilarityCluster } from '@/lib/similarityService';
+import { ThinkingProcessViewer, type ThinkingProcess } from '@/components/ThinkingProcessViewer';
 import { 
   Users, 
   AlertTriangle, 
@@ -31,6 +32,7 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
   const [painPoints, setPainPoints] = useState<SimilarityCluster[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [thinkingProcess, setThinkingProcess] = useState<ThinkingProcess | null>(null);
 
   useEffect(() => {
     analyzeSimilarity();
@@ -40,9 +42,10 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
     setIsLoading(true);
     try {
       // Find similar reports
-      const similar = await similarityService.findSimilarReports(currentReport);
-      setSimilarReports(similar);
-      onSimilarReportsFound?.(similar.length);
+      const similarResult = await similarityService.findSimilarReports(currentReport);
+      setSimilarReports(similarResult.reports);
+      setThinkingProcess(similarResult.thinkingProcess);
+      onSimilarReportsFound?.(similarResult.reports.length);
 
       // Get cluster reports if this report is part of a cluster
       if (currentReport.similarity_cluster_id) {
@@ -51,8 +54,8 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
       }
 
       // Get system-wide pain points
-      const points = await similarityService.getPainPoints();
-      setPainPoints(points);
+      const painPointsResult = await similarityService.getPainPoints();
+      setPainPoints(painPointsResult.clusters);
 
       setAnalysisComplete(true);
     } catch (error) {
@@ -92,15 +95,20 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
       {/* Similar Reports Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Laporan Serupa (7 Hari Terakhir)
-            {similarReports.length > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {similarReports.length} laporan
-              </Badge>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Laporan Serupa (7 Hari Terakhir)
+              {similarReports.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {similarReports.length} laporan
+                </Badge>
+              )}
+            </CardTitle>
+            {thinkingProcess && (
+              <ThinkingProcessViewer thinkingProcess={thinkingProcess} compact={true} />
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {similarReports.length === 0 ? (
