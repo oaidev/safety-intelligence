@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { configService } from './configService';
+import { ThinkingProcessGenerator } from './thinkingProcessGenerator';
+import { ThinkingProcess } from '@/components/ThinkingProcessViewer';
 
 export interface SimilarHazardData {
   id: string;
@@ -32,11 +34,16 @@ export interface HazardSubmissionData {
 
 class SimilarityDetectionService {
   /**
-   * Check for similar hazards before submission
+   * Check for similar hazards before submission with thinking process
    */
-  async checkSimilarHazards(submissionData: HazardSubmissionData): Promise<SimilarHazardData[]> {
+  async checkSimilarHazards(submissionData: HazardSubmissionData): Promise<{ 
+    similarHazards: SimilarHazardData[], 
+    thinkingProcess: ThinkingProcess 
+  }> {
+    const thinkingGen = new ThinkingProcessGenerator();
+    
     try {
-      // Load configurations from database
+      // Step 1: Load configuration
       const configs = await configService.getMultiple([
         'similarity_time_window',
         'similarity_location_radius',
@@ -59,21 +66,31 @@ class SimilarityDetectionService {
         finding_description: 0.14
       };
 
+      thinkingGen.addConfigStep('Similarity Detection', {
+        'Time Window': `${timeWindowDays} hari`,
+        'Location Radius': `${locationRadiusKm} km`,
+        'Similarity Threshold': `${(similarityThreshold * 100).toFixed(0)}%`,
+        'Max Results': topN
+      });
+
+      // Step 2: Parse coordinates
       const lat = parseFloat(submissionData.latitude || '0');
       const lng = parseFloat(submissionData.longitude || '0');
       const hasValidCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
 
-      console.log('Similarity Check - Input coordinates:', {
-        input_lat: submissionData.latitude,
-        input_lng: submissionData.longitude,
-        parsed_lat: lat,
-        parsed_lng: lng,
-        hasValidCoords
-      });
+      thinkingGen.addStep(
+        thinkingGen['steps'].length + 1,
+        'Validasi Koordinat',
+        hasValidCoords ? 'Koordinat GPS valid ditemukan' : 'Tidak ada koordinat GPS valid',
+        hasValidCoords 
+          ? `**Latitude**: ${lat}\n**Longitude**: ${lng}\n\nPencarian berdasarkan lokasi geografis akan diaktifkan.`
+          : 'Pencarian akan dilakukan tanpa filter radius geografis.',
+        hasValidCoords ? 'success' : 'warning'
+      );
 
+      // Step 3: Query database
       const startDate = new Date(Date.now() - timeWindowDays * 24 * 60 * 60 * 1000);
 
-      // Base query for similar hazards
       let query = supabase
         .from('hazard_reports')
         .select(`
@@ -93,7 +110,6 @@ class SimilarityDetectionService {
         `)
         .gte('created_at', startDate.toISOString());
 
-      // Add location-based filtering if coordinates are provided
       if (hasValidCoords) {
         query = query.not('latitude', 'is', null).not('longitude', 'is', null);
       }
@@ -102,107 +118,87 @@ class SimilarityDetectionService {
 
       if (error) {
         console.error('Error fetching hazards for similarity check:', error);
-        return [];
+        thinkingGen.addWarningStep('Error mengambil data dari database', error.message);
+        return {
+          similarHazards: [],
+          thinkingProcess: thinkingGen.build('Gagal menganalisis similaritas karena error database')
+        };
       }
 
       if (!hazards || hazards.length === 0) {
-        return [];
+        thinkingGen.addDatabaseQueryStep(
+          'hazard_reports',
+          [`created_at >= ${startDate.toISOString()}`],
+          0
+        );
+        return {
+          similarHazards: [],
+          thinkingProcess: thinkingGen.build('Tidak ada laporan dalam time window yang ditentukan')
+        };
       }
 
-      const similarHazards: SimilarHazardData[] = [];
+      thinkingGen.addDatabaseQueryStep(
+        'hazard_reports',
+        [
+          `created_at >= ${startDate.toISOString()}`,
+          hasValidCoords ? 'latitude IS NOT NULL, longitude IS NOT NULL' : 'Tanpa filter koordinat'
+        ],
+        hazards.length
+      );
+
+      // Step 4: Calculate similarity for each candidate
+      const similarHazards: (SimilarHazardData & { breakdown: Record<string, number> })[] = [];
 
       for (const hazard of hazards) {
         let similarityScore = 0;
         let distanceKm: number | undefined;
+        const breakdown: Record<string, number> = {};
 
-        console.log(`\n=== Comparing with hazard ${hazard.tracking_id} ===`);
-        console.log('Stored coordinates:', {
-          stored_lat: hazard.latitude,
-          stored_lng: hazard.longitude,
-          stored_lat_type: typeof hazard.latitude,
-          stored_lng_type: typeof hazard.longitude
-        });
-
-        // 1. Location radius similarity (within 1km radius) - Weight: 0.22
-        let locationRadiusScore = 0;
+        // 1. Location radius similarity
         if (hasValidCoords && hazard.latitude && hazard.longitude) {
           const storedLat = parseFloat(hazard.latitude.toString());
           const storedLng = parseFloat(hazard.longitude.toString());
-          
-          console.log('Distance calculation:', {
-            input_coords: [lat, lng],
-            stored_coords: [storedLat, storedLng],
-            coords_valid: !isNaN(storedLat) && !isNaN(storedLng)
-          });
-
           distanceKm = this.calculateDistance(lat, lng, storedLat, storedLng);
-          
-          console.log('Distance result:', { distance_km: distanceKm });
 
           if (distanceKm <= locationRadiusKm) {
-            locationRadiusScore = weights.location_radius;
+            breakdown['Location Radius'] = weights.location_radius;
             similarityScore += weights.location_radius;
-            console.log(`✅ Location radius match: +${weights.location_radius}`);
-          } else {
-            console.log(`❌ Distance too far: ${distanceKm}km > ${locationRadiusKm}km`);
           }
-        } else {
-          console.log('❌ No valid coordinates for radius comparison');
         }
 
         // 2. Location name exact match
-        let locationNameScore = 0;
         if (this.normalizeText(hazard.location) === this.normalizeText(submissionData.location)) {
-          locationNameScore = weights.location_name;
+          breakdown['Location Name'] = weights.location_name;
           similarityScore += weights.location_name;
-          console.log(`✅ Location name match: +${weights.location_name}`);
-        } else {
-          console.log(`❌ Location name mismatch: "${this.normalizeText(hazard.location)}" vs "${this.normalizeText(submissionData.location)}"`);
         }
 
         // 3. Detail location exact match
-        let detailLocationScore = 0;
         if (submissionData.detail_location && hazard.detail_location && 
             this.normalizeText(hazard.detail_location) === this.normalizeText(submissionData.detail_location)) {
-          detailLocationScore = weights.detail_location;
+          breakdown['Detail Location'] = weights.detail_location;
           similarityScore += weights.detail_location;
-          console.log(`✅ Detail location match: +${weights.detail_location}`);
-        } else {
-          console.log(`❌ Detail location mismatch: "${hazard.detail_location}" vs "${submissionData.detail_location}"`);
         }
 
         // 4. Location description semantic similarity
-        let locationDescriptionScore = 0;
         if (submissionData.location_description && hazard.location_description) {
           const descSimilarity = this.calculateTextSimilarity(
             this.normalizeText(submissionData.location_description),
             this.normalizeText(hazard.location_description)
           );
-          locationDescriptionScore = descSimilarity * weights.location_description;
-          similarityScore += locationDescriptionScore;
-          console.log(`✅ Location description similarity: +${locationDescriptionScore.toFixed(3)} (${(descSimilarity * 100).toFixed(1)}% match)`);
-        } else {
-          console.log('❌ No location description for comparison');
+          breakdown['Location Description'] = descSimilarity * weights.location_description;
+          similarityScore += descSimilarity * weights.location_description;
         }
 
         // 5. Non-compliance exact match
-        let nonComplianceScore = 0;
         if (this.normalizeText(hazard.non_compliance) === this.normalizeText(submissionData.non_compliance)) {
-          nonComplianceScore = weights.non_compliance;
+          breakdown['Non-Compliance'] = weights.non_compliance;
           similarityScore += weights.non_compliance;
-          console.log(`✅ Non-compliance match: +${weights.non_compliance}`);
-        } else {
-          console.log(`❌ Non-compliance mismatch: "${this.normalizeText(hazard.non_compliance)}" vs "${this.normalizeText(submissionData.non_compliance)}"`);
         }
 
         // 6. Sub non-compliance exact match
-        let subNonComplianceScore = 0;
         if (this.normalizeText(hazard.sub_non_compliance) === this.normalizeText(submissionData.sub_non_compliance)) {
-          subNonComplianceScore = weights.sub_non_compliance;
+          breakdown['Sub Non-Compliance'] = weights.sub_non_compliance;
           similarityScore += weights.sub_non_compliance;
-          console.log(`✅ Sub non-compliance match: +${weights.sub_non_compliance}`);
-        } else {
-          console.log(`❌ Sub non-compliance mismatch: "${this.normalizeText(hazard.sub_non_compliance)}" vs "${this.normalizeText(submissionData.sub_non_compliance)}"`);
         }
 
         // 7. Finding description semantic similarity
@@ -211,56 +207,86 @@ class SimilarityDetectionService {
           submissionData.finding_description,
           extractedDescription
         );
-        const descriptionScore = descriptionSimilarity * weights.finding_description;
-        similarityScore += descriptionScore;
-        
-        console.log('Description comparison:', {
-          input_description: submissionData.finding_description,
-          stored_raw: hazard.finding_description,
-          stored_extracted: extractedDescription,
-          similarity: descriptionSimilarity,
-          score: descriptionScore
-        });
+        breakdown['Finding Description'] = descriptionSimilarity * weights.finding_description;
+        similarityScore += descriptionSimilarity * weights.finding_description;
 
-        // Apply safety cap to ensure similarity never exceeds 1.0 (100%)
         similarityScore = Math.min(similarityScore, 1.0);
-        
-        // Log warning if original score would have exceeded 1.0
-        if (similarityScore === 1.0 && (0.22 + 0.18 + 0.14 + 0.09 + 0.14 + 0.09 + 0.14) < similarityScore) {
-          console.warn('⚠️ Similarity score was capped at 1.0 to prevent exceeding 100%');
-        }
 
-        console.log(`Final similarity score: ${similarityScore} (${(similarityScore * 100).toFixed(1)}%)`);
-
-        // Only include if similarity score is above threshold
         if (similarityScore >= similarityThreshold) {
           similarHazards.push({
             ...hazard,
             distance_km: distanceKm,
-            similarity_score: similarityScore
+            similarity_score: similarityScore,
+            breakdown
           });
         }
       }
 
-      // Sort by similarity score descending, then by distance ascending
-      return similarHazards.sort((a, b) => {
+      // Step 5: Filter by threshold
+      thinkingGen.addFilteringStep(
+        hazards.length,
+        similarHazards.length,
+        `threshold ≥ ${(similarityThreshold * 100).toFixed(0)}%`
+      );
+
+      // Step 6: Rank results
+      const sortedHazards = similarHazards.sort((a, b) => {
         if (a.similarity_score !== b.similarity_score) {
           return (b.similarity_score || 0) - (a.similarity_score || 0);
         }
         return (a.distance_km || 999) - (b.distance_km || 999);
       }).slice(0, topN);
 
+      if (sortedHazards.length > 0) {
+        thinkingGen.addRankingStep(
+          sortedHazards.map(h => ({
+            id: h.tracking_id,
+            score: h.similarity_score || 0
+          }))
+        );
+
+        // Add breakdown for top result
+        if (sortedHazards[0].breakdown) {
+          const topBreakdown = sortedHazards[0].breakdown;
+          thinkingGen.addStep(
+            thinkingGen['steps'].length + 1,
+            'Detail Similaritas Tertinggi',
+            `Breakdown skor untuk ${sortedHazards[0].tracking_id}`,
+            ThinkingProcessGenerator.formatBreakdown(topBreakdown),
+            'success'
+          );
+        }
+      }
+
+      // Remove breakdown from final results
+      const finalResults = sortedHazards.map(({ breakdown, ...rest }) => rest);
+
+      const summary = finalResults.length > 0
+        ? `Ditemukan ${finalResults.length} laporan serupa dari ${hazards.length} kandidat`
+        : `Tidak ada laporan serupa dari ${hazards.length} kandidat yang dianalisis`;
+
+      return {
+        similarHazards: finalResults,
+        thinkingProcess: thinkingGen.build(summary, {
+          category: 'similarity-detection',
+          candidatesAnalyzed: hazards.length,
+          finalResults: finalResults.length,
+          configUsed: { timeWindowDays, locationRadiusKm, similarityThreshold, topN }
+        })
+      };
+
     } catch (error) {
       console.error('Error in similarity detection:', error);
-      return [];
+      thinkingGen.addWarningStep('Error sistem', String(error));
+      return {
+        similarHazards: [],
+        thinkingProcess: thinkingGen.build('Gagal melakukan analisis similaritas')
+      };
     }
   }
 
-  /**
-   * Calculate distance between two coordinates using Haversine formula
-   */
   private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371; // Earth's radius in kilometers
+    const R = 6371;
     const dLat = this.toRadians(lat2 - lat1);
     const dLon = this.toRadians(lon2 - lon1);
     
@@ -280,15 +306,9 @@ class SimilarityDetectionService {
     return text.toLowerCase().trim().replace(/\s+/g, ' ');
   }
 
-  /**
-   * Extract just the description text from stored finding_description that may contain formatting
-   * Example: "Ketidaksesuaian: APD\nSub Ketidaksesuaian: Cara Penggunaan APD\nDeskripsi Temuan: tidak pakai apd di ketinggian"
-   * Should return: "tidak pakai apd di ketinggian"
-   */
   private extractDescriptionFromStored(storedDescription: string): string {
     if (!storedDescription) return '';
     
-    // Look for "Deskripsi Temuan:" pattern and extract what comes after it
     const deskripsiPattern = /Deskripsi Temuan:\s*(.+?)(?:\n|$)/i;
     const match = storedDescription.match(deskripsiPattern);
     
@@ -296,14 +316,9 @@ class SimilarityDetectionService {
       return match[1].trim();
     }
     
-    // If no pattern found, return the original description
     return storedDescription;
   }
 
-  /**
-   * Calculate semantic similarity between two text descriptions
-   * Uses a combination of Jaccard similarity and Levenshtein distance
-   */
   private calculateTextSimilarity(text1: string, text2: string): number {
     if (!text1 || !text2) return 0;
 
@@ -312,7 +327,6 @@ class SimilarityDetectionService {
 
     if (normalized1 === normalized2) return 1.0;
 
-    // Calculate Jaccard similarity (word overlap)
     const words1 = new Set(normalized1.split(/\s+/));
     const words2 = new Set(normalized2.split(/\s+/));
     
@@ -321,18 +335,13 @@ class SimilarityDetectionService {
     
     const jaccardSimilarity = intersection.size / union.size;
 
-    // Calculate normalized Levenshtein distance
     const levenshteinDistance = this.levenshteinDistance(normalized1, normalized2);
     const maxLength = Math.max(normalized1.length, normalized2.length);
     const levenshteinSimilarity = maxLength > 0 ? 1 - (levenshteinDistance / maxLength) : 0;
 
-    // Combine both metrics (weighted average)
     return (jaccardSimilarity * 0.6) + (levenshteinSimilarity * 0.4);
   }
 
-  /**
-   * Calculate Levenshtein distance between two strings
-   */
   private levenshteinDistance(str1: string, str2: string): number {
     const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
 
@@ -343,9 +352,9 @@ class SimilarityDetectionService {
       for (let i = 1; i <= str1.length; i++) {
         const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
         matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1, // deletion
-          matrix[j - 1][i] + 1, // insertion
-          matrix[j - 1][i - 1] + indicator // substitution
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + indicator
         );
       }
     }

@@ -14,6 +14,7 @@ import { AlertTriangle, Upload, RotateCcw, Send, Building2, X, Eye, MapPin, Exte
 import { useToast } from '@/hooks/use-toast';
 import { SimilarityCheckDialog } from '@/components/SimilarityCheckDialog';
 import { similarityDetectionService, type SimilarHazardData } from '@/lib/similarityDetectionService';
+import { ThinkingProcess } from '@/components/ThinkingProcessViewer';
 
 // Form schema
 const hazardFormSchema = z.object({
@@ -230,6 +231,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [similarityDialogOpen, setSimilarityDialogOpen] = useState(false);
   const [similarHazards, setSimilarHazards] = useState<SimilarHazardData[]>([]);
+  const [similarityThinkingProcess, setSimilarityThinkingProcess] = useState<ThinkingProcess | undefined>();
   const [pendingSubmissionData, setPendingSubmissionData] = useState<any>(null);
 
   const form = useForm<HazardFormData>({
@@ -280,7 +282,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
     console.log('[ComprehensiveHazardForm] Starting similarity check for data:', data);
     
     // Check for similar hazards before submission
-    const similarHazards = await similarityDetectionService.checkSimilarHazards({
+    const { similarHazards: foundHazards, thinkingProcess } = await similarityDetectionService.checkSimilarHazards({
       location: data.location,
       detail_location: data.detailLocation,
       location_description: data.locationDescription,
@@ -291,11 +293,12 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: Comp
       longitude: data.longitude,
     });
 
-    console.log('[ComprehensiveHazardForm] Found similar hazards:', similarHazards);
+    console.log('[ComprehensiveHazardForm] Found similar hazards:', foundHazards);
 
-    if (similarHazards.length > 0) {
-      console.log('[ComprehensiveHazardForm] Opening similarity dialog with', similarHazards.length, 'similar hazards');
-      setSimilarHazards(similarHazards);
+    if (foundHazards.length > 0) {
+      console.log('[ComprehensiveHazardForm] Opening similarity dialog with', foundHazards.length, 'similar hazards');
+      setSimilarHazards(foundHazards);
+      setSimilarityThinkingProcess(thinkingProcess);
       setPendingSubmissionData(data);
       setSimilarityDialogOpen(true);
     } else {
@@ -921,6 +924,7 @@ Keterangan Lokasi: ${data.locationDescription}
         open={similarityDialogOpen}
         onOpenChange={setSimilarityDialogOpen}
         similarHazards={similarHazards}
+        thinkingProcess={similarityThinkingProcess}
         onContinueSubmission={handleContinueSubmission}
         onEditForm={handleEditForm}
       />

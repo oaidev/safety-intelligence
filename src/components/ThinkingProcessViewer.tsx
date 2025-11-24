@@ -31,6 +31,13 @@ export interface ThinkingProcess {
   steps: ThinkingStep[];
   totalDuration: number;
   summary: string;
+  metadata?: {
+    category?: 'similarity-detection' | 'similarity-analysis' | 'clustering' | 'pain-point-detection' | 'recommendations' | 'investigation' | 'batch-analysis';
+    configUsed?: any;
+    candidatesAnalyzed?: number;
+    finalResults?: number;
+    [key: string]: any;
+  };
 }
 
 interface ThinkingProcessViewerProps {
