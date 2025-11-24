@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,35 +61,27 @@ serve(async (req) => {
 
     console.log('Generating recommendations for hazard:', hazardData.deskripsi_temuan.substring(0, 100));
 
-    // Create comprehensive prompt for safety hazard analysis
-    const prompt = `Anda adalah ahli K3 (Keselamatan dan Kesehatan Kerja) yang berpengalaman dalam menganalisis hazard dan memberikan rekomendasi. Berdasarkan informasi berikut, berikan analisis mendalam dan rekomendasi yang komprehensif:
+    // Fetch prompt template from database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-INFORMASI TEMUAN:
-- Deskripsi Temuan: ${hazardData.deskripsi_temuan}
-- Lokasi: ${hazardData.lokasi}
-- Ketidaksesuaian: ${hazardData.ketidaksesuaian}
-- Sub Ketidaksesuaian: ${hazardData.sub_ketidaksesuaian}
-- Quick Action: ${hazardData.quick_action || 'Tidak ada'}
+    const { data: promptData, error: promptError } = await supabase.functions.invoke('get-system-prompt', {
+      body: { prompt_id: 'hazard-recommendations' }
+    });
 
-Berikan respons dalam format JSON yang valid dengan struktur berikut:
+    if (promptError || !promptData?.prompt_template) {
+      console.error('Failed to fetch prompt template, using fallback');
+      throw new Error('Prompt template not available');
+    }
 
-{
-  "root_cause_analysis": "Analisis akar masalah yang mendalam, mencakup faktor manusia, peralatan, lingkungan, dan sistem manajemen yang berkontribusi terhadap temuan ini",
-  "corrective_actions": "Tindakan perbaikan segera yang spesifik dan dapat diimplementasikan untuk mengatasi temuan ini",
-  "preventive_measures": "Langkah-langkah pencegahan jangka panjang untuk mencegah terulangnya temuan serupa",
-  "risk_level": "HIGH/MEDIUM/LOW berdasarkan tingkat bahaya dan konsekuensi potensial",
-  "kategori_temuan": "Kondisi Tidak Aman atau Tindakan Tidak Aman",
-  "jenis_tindakan": "PERBAIKAN/PELATIHAN/INVESTIGASI/MONITORING",
-  "alur_permasalahan": "Penjelasan alur bagaimana masalah ini dapat berkembang menjadi insiden",
-  "tindakan": "Tindakan spesifik yang harus dilakukan dengan prioritas dan timeline yang jelas",
-  "due_date_suggestion": "Jumlah hari untuk penyelesaian (1-30 hari berdasarkan tingkat risiko)"
-}
-
-PENTING: 
-- Berikan respons HANYA dalam format JSON yang valid
-- Gunakan bahasa Indonesia yang profesional
-- Sesuaikan rekomendasi dengan konteks industri dan lokasi kerja
-- Pertimbangkan regulasi K3 Indonesia dan standar internasional`;
+    // Replace placeholders with actual hazard data
+    const prompt = promptData.prompt_template
+      .replace('{DESKRIPSI_TEMUAN}', hazardData.deskripsi_temuan)
+      .replace('{LOKASI}', hazardData.lokasi)
+      .replace('{KETIDAKSESUAIAN}', hazardData.ketidaksesuaian)
+      .replace('{SUB_KETIDAKSESUAIAN}', hazardData.sub_ketidaksesuaian)
+      .replace('{QUICK_ACTION}', hazardData.quick_action || 'Tidak ada');
 
     // Create content array for Gemini API
     const content = [{

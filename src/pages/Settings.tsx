@@ -1,5 +1,7 @@
 import { KnowledgeBaseManager } from "@/components/KnowledgeBaseManager";
+import SystemPromptsManager from "@/components/SystemPromptsManager";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -17,12 +19,25 @@ const Settings = () => {
       </Link>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-            <p className="text-muted-foreground">Manage knowledge bases and system configuration</p>
+            <p className="text-muted-foreground">Manage knowledge bases, AI prompts, and system configuration</p>
           </div>
         </div>
 
-        {/* Main Content */}
-        <KnowledgeBaseManager />
+        {/* Tabs for different settings sections */}
+        <Tabs defaultValue="knowledge-bases" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="knowledge-bases">Knowledge Bases</TabsTrigger>
+            <TabsTrigger value="ai-prompts">AI Prompts</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="knowledge-bases">
+            <KnowledgeBaseManager />
+          </TabsContent>
+
+          <TabsContent value="ai-prompts">
+            <SystemPromptsManager />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,77 +31,29 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY not found');
     }
 
-    // Build the analysis prompt
-    const analysisPrompt = `
-Analisis kualitas laporan hazard berikut menggunakan 3 aspek scoring:
+    // Fetch prompt template from database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-FORM DATA:
-Deskripsi Temuan: "${formData.deskripsi_temuan}"
-Ketidaksesuaian: "${formData.ketidaksesuaian}"
-Sub Ketidaksesuaian: "${formData.sub_ketidaksesuaian}"
-Tools Pengamatan: "${formData.tools_pengamatan}"
-Lokasi: "${formData.lokasi_detail}"
-Keterangan Lokasi: "${formData.location_description || 'Tidak ada'}"
-Quick Action: "${formData.quick_action}"
+    const { data: promptData, error: promptError } = await supabase.functions.invoke('get-system-prompt', {
+      body: { prompt_id: 'hazard-quality-scoring' }
+    });
 
-Berikan scoring 1-100 untuk setiap aspek berikut:
-
-1. CONSISTENCY SCORE (Konsistensi Antar Field) - 35% weight
-Apakah Deskripsi Temuan sesuai dengan Ketidaksesuaian yang dipilih?
-Apakah Sub Ketidaksesuaian relevan dengan Ketidaksesuaian utama?
-Apakah Quick Action sesuai dengan severity temuan?
-
-2. COMPLETENESS SCORE (Kelengkapan Deskripsi) - 40% weight
-Evaluasi kelengkapan berdasarkan 5W1H termasuk keterangan lokasi:
-WHO: Siapa yang terlibat? (pekerja, operator, pengawas)
-WHAT: Apa yang terjadi? (aktivitas, pelanggaran spesifik)
-WHERE: Dimana kejadian? (lokasi spesifik, area kerja, keterangan lokasi detail)
-WHEN: Kapan terjadi? (waktu, shift, kondisi)
-WHY: Mengapa terjadi? (root cause, kondisi pemicu)
-HOW: Bagaimana terjadi? (sequence of events, mekanisme)
-
-3. IMAGE RELEVANCE SCORE (Kesesuaian Gambar) - 25% weight
-JIKA TIDAK ADA IMAGE: return score 0
-JIKA ADA IMAGE:
-- Apakah image menunjukkan hazard yang dideskripsikan?
-- Apakah image mendukung claims dalam Deskripsi Temuan?
-- Kualitas image (clarity, angle, detail visibility)
-- Apakah image menunjukkan konteks lokasi yang sesuai?
-
-WAJIB: Berikan response dalam format JSON yang valid berikut:
-{
-  "scores": {
-    "consistency": 85,
-    "completeness": 70,
-    "image_relevance": 0,
-    "overall": 62
-  },
-  "detailed_analysis": {
-    "consistency": {
-      "score": 85,
-      "findings": ["Deskripsi temuan sesuai dengan ketidaksesuaian APD"],
-      "issues": ["Quick action mungkin kurang tegas untuk pelanggaran ini"]
-    },
-    "completeness": {
-      "score": 70,
-      "missing_elements": ["Waktu kejadian tidak disebutkan"],
-      "strong_points": ["Lokasi spesifik jelas", "Keterangan lokasi detail"]
-    },
-    "image_relevance": {
-      "score": 0,
-      "findings": [],
-      "issues": ["Tidak ada gambar yang disertakan"]
+    if (promptError || !promptData?.prompt_template) {
+      console.error('Failed to fetch prompt template, using fallback');
+      throw new Error('Prompt template not available');
     }
-  },
-  "recommendations": [
-    "HIGH PRIORITY: Tambahkan informasi waktu kejadian",
-    "MEDIUM: Sertakan informasi pengawas"
-  ],
-  "suggested_improvements": {
-    "deskripsi_temuan": "Tambahkan informasi waktu dan konteks",
-    "quick_action": "Pertimbangkan tindakan yang lebih tegas"
-  }
-}`;
+
+    // Replace placeholders with actual form data
+    const analysisPrompt = promptData.prompt_template
+      .replace('{DESKRIPSI_TEMUAN}', formData.deskripsi_temuan)
+      .replace('{KETIDAKSESUAIAN}', formData.ketidaksesuaian)
+      .replace('{SUB_KETIDAKSESUAIAN}', formData.sub_ketidaksesuaian)
+      .replace('{TOOLS_PENGAMATAN}', formData.tools_pengamatan)
+      .replace('{LOKASI_DETAIL}', formData.lokasi_detail)
+      .replace('{LOCATION_DESCRIPTION}', formData.location_description || 'Tidak ada')
+      .replace('{QUICK_ACTION}', formData.quick_action);
 
     // Prepare the request for Gemini API
     const requestBody: any = {
