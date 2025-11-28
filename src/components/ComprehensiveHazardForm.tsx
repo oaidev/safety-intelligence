@@ -50,6 +50,7 @@ type HazardFormData = z.infer<typeof hazardFormSchema>;
 interface ComprehensiveHazardFormProps {
   onSubmit: (data: { description: string; formData: HazardFormData & { uploadedImage?: string } }) => void;
   isSubmitting?: boolean;
+  compact?: boolean;
 }
 
 // Dropdown options
@@ -225,7 +226,7 @@ const quickActions = [
   'Tidak diperlukan intervensi'
 ];
 
-export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false }: ComprehensiveHazardFormProps) {
+export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false, compact = false }: ComprehensiveHazardFormProps) {
   const { toast } = useToast();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);

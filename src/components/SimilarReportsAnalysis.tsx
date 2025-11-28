@@ -24,9 +24,10 @@ import { Link } from 'react-router-dom';
 interface SimilarReportsAnalysisProps {
   currentReport: HazardReport;
   onSimilarReportsFound?: (count: number) => void;
+  compact?: boolean;
 }
 
-export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }: SimilarReportsAnalysisProps) {
+export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound, compact = false }: SimilarReportsAnalysisProps) {
   const [similarReports, setSimilarReports] = useState<HazardReport[]>([]);
   const [clusterReports, setClusterReports] = useState<HazardReport[]>([]);
   const [painPoints, setPainPoints] = useState<SimilarityCluster[]>([]);
@@ -85,6 +86,66 @@ export function SimilarReportsAnalysis({ currentReport, onSimilarReportsFound }:
             <Clock className="h-4 w-4 animate-spin" />
             Menganalisis laporan serupa...
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (compact) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Laporan Serupa
+              {similarReports.length > 0 && (
+                <Badge variant="secondary" className="text-xs ml-1">
+                  {similarReports.length}
+                </Badge>
+              )}
+            </CardTitle>
+            {thinkingProcess && (
+              <ThinkingProcessViewer thinkingProcess={thinkingProcess} compact={true} />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="text-sm">
+          {similarReports.length === 0 ? (
+            <Alert className="py-2">
+              <Lightbulb className="h-3 w-3" />
+              <AlertDescription className="text-xs">
+                Tidak ada laporan serupa dalam 7 hari terakhir.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-2">
+              <Alert className="border-orange-200 bg-orange-50 py-2">
+                <AlertTriangle className="h-3 w-3" />
+                <AlertDescription className="text-xs">
+                  {similarReports.length} laporan serupa ditemukan. Perhatikan pola masalah berulang.
+                </AlertDescription>
+              </Alert>
+              {similarReports.slice(0, 3).map((report) => (
+                <div key={report.id} className="border rounded p-2 text-xs hover:bg-muted/30">
+                  <div className="flex items-center justify-between mb-1">
+                    <Badge variant="outline" className="text-xs">{report.tracking_id}</Badge>
+                    <Button asChild variant="ghost" size="sm" className="h-6 px-2">
+                      <Link to={`/evaluate/${report.id}`}>
+                        <Eye className="h-3 w-3" />
+                      </Link>
+                    </Button>
+                  </div>
+                  <div className="text-muted-foreground">{report.location}</div>
+                </div>
+              ))}
+              {similarReports.length > 3 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  +{similarReports.length - 3} laporan lainnya
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     );

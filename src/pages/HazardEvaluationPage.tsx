@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { hazardReportService } from '@/lib/hazardReportService';
 import { hiraRecommendationService } from '@/lib/hiraRecommendationService';
@@ -28,7 +29,8 @@ import {
   FileText,
   Zap,
   Target,
-  Shield
+  Shield,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -306,298 +308,291 @@ export default function HazardEvaluationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/50 p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/evaluator')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Detail Laporan</h1>
-              <p className="text-muted-foreground">Evaluasi dan tindak lanjut hazard report</p>
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/50 p-4">
+      <div className="max-w-[1600px] mx-auto space-y-4">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={() => navigate('/evaluator')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Kembali
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold">{report.tracking_id}</h1>
+                <p className="text-sm text-muted-foreground">{format(new Date(report.created_at), 'dd MMM yyyy HH:mm', { locale: idLocale })}</p>
+              </div>
             </div>
+            <Badge variant={getStatusBadgeVariant(report.status)} className="px-4 py-2">
+              {getStatusLabel(report.status)}
+            </Badge>
           </div>
-          <Badge variant={getStatusBadgeVariant(report.status)} className="text-lg px-4 py-2">
-            {getStatusLabel(report.status)}
-          </Badge>
         </div>
 
-        {/* Header Information */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
+        {/* Main 3-Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Column 1: Informasi Laporan */}
+          <Card className="h-fit">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
                 Informasi Laporan
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 text-sm">
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">ID Laporan</Label>
-                <p className="font-mono text-lg">{report.tracking_id}</p>
+                <Label className="text-xs text-muted-foreground">Perusahaan</Label>
+                <p className="font-medium">{report.reporter_company || '-'}</p>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">Tanggal Pembuatan</Label>
-                <p>{format(new Date(report.created_at), 'EEEE, dd MMM yyyy HH:mm', { locale: idLocale })}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Perusahaan</Label>
-                <p>{report.reporter_company || 'Tidak diisi'}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Pelapor</Label>
-                <p className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
+                <Label className="text-xs text-muted-foreground">Pelapor</Label>
+                <p className="font-medium flex items-center gap-1">
+                  <User className="h-3 w-3" />
                   {report.reporter_name}
-                  {report.reporter_position && (
-                    <span className="text-muted-foreground">- {report.reporter_position}</span>
-                  )}
                 </p>
               </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Posisi</Label>
+                <p>{report.reporter_position || '-'}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Area PJA BC</Label>
+                <p>{report.area_pja_bc || '-'}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">PJA Mitra</Label>
+                <p>{report.pja_mitra_kerja || '-'}</p>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Informasi Lokasi
+          {/* Column 2: Lokasi & Temuan */}
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Lokasi & Temuan
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Site</Label>
-                <p>{report.site || 'Tidak diisi'}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Lokasi</Label>
-                <p>{report.location}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Detail Lokasi</Label>
-                <p>{report.detail_location || 'Tidak diisi'}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Keterangan</Label>
-                <p>{report.location_description || 'Tidak diisi'}</p>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
+            <CardContent className="space-y-4 text-sm max-h-[calc(100vh-200px)] overflow-y-auto">
+              {/* Lokasi */}
+              <div className="space-y-2">
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Area PJA BC</Label>
-                  <p>{report.area_pja_bc || 'Tidak diisi'}</p>
+                  <Label className="text-xs text-muted-foreground">Site</Label>
+                  <p className="font-medium">{report.site || '-'}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">PJA Mitra Kerja</Label>
-                  <p>{report.pja_mitra_kerja || 'Tidak diisi'}</p>
+                  <Label className="text-xs text-muted-foreground">Lokasi</Label>
+                  <p className="font-medium">{report.location}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Detail Lokasi</Label>
+                  <p>{report.detail_location || '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Keterangan</Label>
+                  <p className="text-xs">{report.location_description || '-'}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Original Findings Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Deskripsi Objek
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Ketidaksesuaian</Label>
-                <p className="font-medium">{report.non_compliance}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Sub Ketidaksesuaian</Label>
-                <p>{report.sub_non_compliance}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Quick Action</Label>
-                <p>{report.quick_action}</p>
-              </div>
-            </div>
-            
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Deskripsi Temuan</Label>
-              <p className="mt-2 p-4 bg-muted rounded-lg whitespace-pre-wrap">{report.finding_description}</p>
-            </div>
+              <Separator />
 
-            {/* Image Section */}
-            {report.image_base64 && (
+              {/* Temuan */}
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Ketidaksesuaian</Label>
+                  <p className="font-medium">{report.non_compliance}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Sub Ketidaksesuaian</Label>
+                  <p className="text-xs">{report.sub_non_compliance}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Quick Action</Label>
+                  <Badge variant="outline" className="text-xs">{report.quick_action}</Badge>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Deskripsi */}
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">Bukti Temuan</Label>
-                <div className="mt-2">
+                <Label className="text-xs text-muted-foreground">Deskripsi Temuan</Label>
+                <p className="mt-1 p-2 bg-muted rounded text-xs whitespace-pre-wrap">{report.finding_description}</p>
+              </div>
+
+              {/* Image */}
+              {report.image_base64 && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Bukti Temuan</Label>
                   <img 
                     src={report.image_base64.startsWith('data:') ? report.image_base64 : `data:image/jpeg;base64,${report.image_base64}`}
-                    alt="Bukti temuan"
-                    className="max-w-md rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                    alt="Bukti"
+                    className="mt-2 w-full rounded cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setImageDialogOpen(true)}
                   />
                   <p className="text-xs text-muted-foreground mt-1">Klik untuk memperbesar</p>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Similarity Analysis */}
-        <SimilarReportsAnalysis 
-          currentReport={{
-            id: report.id,
-            tracking_id: report.tracking_id,
-            reporter_name: report.reporter_name,
-            location: report.location,
-            non_compliance: report.non_compliance,
-            sub_non_compliance: report.sub_non_compliance,
-            finding_description: report.finding_description,
-            status: report.status,
-            created_at: report.created_at,
-            similarity_cluster_id: report.similarity_cluster_id
-          }}
-          onSimilarReportsFound={(count) => console.log(`Found ${count} similar reports`)}
-        />
+          {/* Column 3: Similar Reports & Pengendalian */}
+          <div className="space-y-4">
+            <SimilarReportsAnalysis 
+              compact
+              currentReport={{
+                id: report.id,
+                tracking_id: report.tracking_id,
+                reporter_name: report.reporter_name,
+                location: report.location,
+                non_compliance: report.non_compliance,
+                sub_non_compliance: report.sub_non_compliance,
+                finding_description: report.finding_description,
+                status: report.status,
+                created_at: report.created_at,
+                similarity_cluster_id: report.similarity_cluster_id
+              }}
+              onSimilarReportsFound={(count) => console.log(`Found ${count} similar reports`)}
+            />
 
-        {/* Follow-up Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
-              Pengendalian
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Konfirmasi</Label>
-                <Select value={evaluationData.konfirmasi} onValueChange={(value) => setEvaluationData(prev => ({ ...prev, konfirmasi: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih konfirmasi" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="RUBAH TINDAKAN">RUBAH TINDAKAN</SelectItem>
-                    <SelectItem value="TUTUP LAPORAN">TUTUP LAPORAN</SelectItem>
-                    <SelectItem value="DUPLIKAT">DUPLIKAT</SelectItem>
-                    <SelectItem value="BUKAN HAZARD">BUKAN HAZARD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
+            {/* Pengendalian Form */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Pengendalian
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
                 <div>
-                  <Label>Jenis Tindakan</Label>
-                  <Select value="PERBAIKAN" onValueChange={(value) => setEvaluationData(prev => ({ ...prev, jenis_tindakan: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih jenis tindakan" />
+                  <Label className="text-xs">Konfirmasi</Label>
+                  <Select value={evaluationData.konfirmasi} onValueChange={(value) => setEvaluationData(prev => ({ ...prev, konfirmasi: value }))}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Pilih konfirmasi" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="PERBAIKAN">PERBAIKAN</SelectItem>
+                      <SelectItem value="RUBAH TINDAKAN">RUBAH TINDAKAN</SelectItem>
+                      <SelectItem value="TUTUP LAPORAN">TUTUP LAPORAN</SelectItem>
+                      <SelectItem value="DUPLIKAT">DUPLIKAT</SelectItem>
+                      <SelectItem value="BUKAN HAZARD">BUKAN HAZARD</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-            </div>
 
-            {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    Akar Permasalahan
-                  </Label>
-                  <Button 
-                    onClick={generateRecommendations}
-                    disabled={generatingRecommendations}
-                    className="w-full"
-                  >
-                    {generatingRecommendations ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generate Recommendation
-                      </>
-                    )}
-                  </Button>
-                </div>
-                
-                {recommendationThinking && (
-                  <ThinkingProcessViewer thinkingProcess={recommendationThinking} compact={true} />
-                )}
-                
-                <Textarea
-                  value={evaluationData.alur_permasalahan}
-                  onChange={(e) => setEvaluationData(prev => ({ ...prev, alur_permasalahan: e.target.value }))}
-                  placeholder="Akar permasalahan akan dihasilkan dari knowledge base HIRA atau AI..."
-                  rows={3}
-                />
-              </div>
-            )}
+                {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
+                  <>
+                    <div>
+                      <Label className="text-xs">Jenis Tindakan</Label>
+                      <Select 
+                        value={evaluationData.jenis_tindakan} 
+                        onValueChange={(value) => setEvaluationData(prev => ({ ...prev, jenis_tindakan: value }))}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Pilih jenis tindakan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PERBAIKAN">PERBAIKAN</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-            {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
-              <div className="space-y-4">
-                <Label className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Tindakan Perbaikan
-                </Label>
-                <Textarea
-                  value={evaluationData.tindakan}
-                  onChange={(e) => setEvaluationData(prev => ({ ...prev, tindakan: e.target.value }))}
-                  placeholder="Tindakan perbaikan akan dihasilkan dari knowledge base HIRA atau AI..."
-                  rows={3}
-                />
-              </div>
-            )}
+                    <div className="space-y-3 p-3 border rounded bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold">Detail Tindakan</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={generateRecommendations}
+                          disabled={generatingRecommendations}
+                          className="h-7 text-xs"
+                        >
+                          {generatingRecommendations ? (
+                            <Clock className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3 w-3 mr-1" />
+                          )}
+                          Generate
+                        </Button>
+                      </div>
 
-            {evaluationData.konfirmasi === 'RUBAH TINDAKAN' && (
-              <div>
-                <Label>Due Date Perbaikan</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !dueDate && "text-muted-foreground"
+                      {recommendationThinking && (
+                        <ThinkingProcessViewer thinkingProcess={recommendationThinking} compact />
                       )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? format(dueDate, "PPP", { locale: idLocale }) : <span>Pilih tanggal</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={(date) => {
-                        setDueDate(date);
-                        setEvaluationData(prev => ({ 
-                          ...prev, 
-                          due_date_perbaikan: date ? date.toISOString().split('T')[0] : '' 
-                        }));
-                      }}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
 
-            <Button onClick={saveEvaluation} disabled={saving} size="lg" className="w-full">
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Menyelesaikan...' : 'Selesaikan Evaluasi'}
-            </Button>
-          </CardContent>
-        </Card>
+                      <div>
+                        <Label className="text-xs">Akar Permasalahan</Label>
+                        <Textarea
+                          value={evaluationData.alur_permasalahan}
+                          onChange={(e) => setEvaluationData(prev => ({ ...prev, alur_permasalahan: e.target.value }))}
+                          placeholder="Akar permasalahan..."
+                          className="min-h-[60px] text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">Tindakan Perbaikan</Label>
+                        <Textarea
+                          value={evaluationData.tindakan}
+                          onChange={(e) => setEvaluationData(prev => ({ ...prev, tindakan: e.target.value }))}
+                          placeholder="Tindakan perbaikan..."
+                          className="min-h-[60px] text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">Due Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "w-full h-9 justify-start text-left font-normal text-xs",
+                                !dueDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-3 w-3" />
+                              {dueDate ? format(dueDate, 'dd MMM yyyy', { locale: idLocale }) : 'Pilih tanggal'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={dueDate}
+                              onSelect={setDueDate}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <Button 
+                  onClick={saveEvaluation}
+                  disabled={saving || !evaluationData.konfirmasi}
+                  className="w-full h-9 text-sm"
+                  size="sm"
+                >
+                  {saving ? (
+                    <>
+                      <Clock className="h-3 w-3 mr-2 animate-spin" />
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3 w-3 mr-2" />
+                      Selesaikan Evaluasi
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {/* Comprehensive Recommendations Display */}
         {showComprehensive && comprehensiveRecommendations && (
