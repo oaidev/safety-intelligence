@@ -118,19 +118,9 @@ const FrontlinerDashboard = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Report Tab */}
-          <TabsContent value="report" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-500" />
-                  Laporkan Temuan Hazard
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <HybridHazardAnalyzer />
-              </CardContent>
-            </Card>
+          {/* Report Tab - Split View */}
+          <TabsContent value="report" className="space-y-4">
+            <HybridHazardAnalyzer splitView />
           </TabsContent>
 
           {/* History Tab */}

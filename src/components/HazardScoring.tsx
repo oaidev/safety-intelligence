@@ -24,9 +24,10 @@ interface HazardScoringProps {
   analysis: AnalysisResult;
   onImproveReport?: (improvements: any) => void;
   onExportReport?: () => void;
+  compact?: boolean;
 }
 
-export function HazardScoring({ analysis, onImproveReport, onExportReport }: HazardScoringProps) {
+export function HazardScoring({ analysis, onImproveReport, onExportReport, compact = false }: HazardScoringProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   const toggleSection = (section: string) => {

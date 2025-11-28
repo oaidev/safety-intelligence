@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { ComprehensiveHazardForm } from '@/components/ComprehensiveHazardForm';
@@ -31,7 +32,11 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export function HybridHazardAnalyzer() {
+interface HybridHazardAnalyzerProps {
+  splitView?: boolean;
+}
+
+export function HybridHazardAnalyzer({ splitView = false }: HybridHazardAnalyzerProps) {
   const [hazardDescription, setHazardDescription] = useState('');
   const [formData, setFormData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -248,6 +253,67 @@ export function HybridHazardAnalyzer() {
     return 'Google Embeddings';
   };
 
+  if (splitView) {
+    // Split View Layout for Frontliner
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Form */}
+        <div className="space-y-4">
+          <ComprehensiveHazardForm 
+            onSubmit={handleActualSubmission}
+            isSubmitting={isAnalyzing}
+            compact
+          />
+        </div>
+
+        {/* Right: Results */}
+        <div className="space-y-4">
+          {isAnalyzing || isScoring ? (
+            <Card>
+              <CardContent className="p-6">
+                <AnalysisLoadingAnimation />
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {scoringAnalysis && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Kualitas Laporan</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <HazardScoring 
+                      analysis={scoringAnalysis}
+                      onImproveReport={handleImproveReport}
+                      onExportReport={handleExportReport}
+                      compact
+                    />
+                  </CardContent>
+                </Card>
+              )}
+              
+              {results && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Analisis Knowledge Base</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AnalysisResults 
+                      results={results} 
+                      isAnalyzing={isAnalyzing}
+                      compact
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Original Full Page Layout
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/50 p-6">
       <div className="max-w-7xl mx-auto space-y-8">

@@ -20,9 +20,10 @@ import { ThinkingProcessViewer } from './ThinkingProcessViewer';
 interface AnalysisResultsProps {
   results: MultiAnalysisResult | null;
   isAnalyzing: boolean;
+  compact?: boolean;
 }
 
-export function AnalysisResults({ results, isAnalyzing }: AnalysisResultsProps) {
+export function AnalysisResults({ results, isAnalyzing, compact = false }: AnalysisResultsProps) {
   const { toast } = useToast();
 
   const copyToClipboard = async (text: string) => {
