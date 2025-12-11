@@ -529,42 +529,60 @@ Buat laporan investigasi dengan format:
   console.log('[InvestigationReport] Report generated successfully, length:', reportText.length);
   onProgress('complete', 'Laporan investigasi berhasil dibuat!');
 
-  // Build thinking process
+  // Build thinking process - simplified format matching ThinkingProcessViewer interface
+  const totalFiles = (audioFiles?.length || 0) + (documentFiles?.length || 0) + (imageFiles?.length || 0) + (videoFiles?.length || 0);
+  
   const thinkingProcess = {
-    title: 'Investigation Report Generation',
     steps: [
       {
-        title: 'Audio Processing',
-        status: 'completed' as const,
-        details: `${audioFiles?.length || 0} audio files processed (${allTranscripts.length} transcribed)`,
-        timestamp: new Date().toISOString(),
+        step: 1,
+        name: 'Proses Audio',
+        description: `${audioFiles?.length || 0} file audio diproses (${allTranscripts.length} transkripsi)`,
+        timestamp: Date.now(),
+        duration: 0,
+        details: { message: audioFiles?.length ? `${allTranscripts.length} transkripsi berhasil` : 'Tidak ada file audio' },
+        status: (audioFiles?.length || 0) > 0 ? 'success' : 'warning' as const,
       },
       {
-        title: 'Document Processing',
-        status: 'completed' as const,
-        details: `${documentFiles?.length || 0} documents processed, ${pdfContents.length} PDFs via OCR`,
-        timestamp: new Date().toISOString(),
+        step: 2,
+        name: 'Proses Dokumen',
+        description: `${documentFiles?.length || 0} dokumen, ${pdfContents.length} PDF via OCR`,
+        timestamp: Date.now(),
+        duration: 0,
+        details: { message: documentFiles?.length ? `${documentFiles.length} dokumen berhasil diproses` : 'Tidak ada dokumen' },
+        status: (documentFiles?.length || 0) > 0 ? 'success' : 'warning' as const,
       },
       {
-        title: 'Video Analysis',
-        status: 'completed' as const,
-        details: `${videoFiles?.length || 0} videos analyzed via AI`,
-        timestamp: new Date().toISOString(),
+        step: 3,
+        name: 'Analisis Video',
+        description: `${videoFiles?.length || 0} video dianalisis via AI`,
+        timestamp: Date.now(),
+        duration: 0,
+        details: { message: videoFiles?.length ? `${videoAnalyses.length} video berhasil dianalisis` : 'Tidak ada video' },
+        status: (videoFiles?.length || 0) > 0 ? 'success' : 'warning' as const,
       },
       {
-        title: 'Image Analysis',
-        status: 'completed' as const,
-        details: `${imageFiles?.length || 0} images included for visual analysis`,
-        timestamp: new Date().toISOString(),
+        step: 4,
+        name: 'Analisis Gambar',
+        description: `${imageFiles?.length || 0} gambar disertakan`,
+        timestamp: Date.now(),
+        duration: 0,
+        details: { message: imageFiles?.length ? `${imageFiles.length} gambar untuk analisis visual` : 'Tidak ada gambar' },
+        status: (imageFiles?.length || 0) > 0 ? 'success' : 'warning' as const,
       },
       {
-        title: 'Report Generation',
-        status: 'completed' as const,
-        details: `Generated ${reportText.length} character comprehensive report`,
-        timestamp: new Date().toISOString(),
+        step: 5,
+        name: 'Laporan Dibuat',
+        description: `Laporan investigasi ${reportText.length.toLocaleString()} karakter`,
+        timestamp: Date.now(),
+        duration: 0,
+        details: { message: 'Laporan investigasi berhasil dibuat' },
+        status: 'success' as const,
       },
     ],
-    summary: `Investigation report from ${(audioFiles?.length || 0) + (documentFiles?.length || 0) + (imageFiles?.length || 0) + (videoFiles?.length || 0)} evidence files with video analysis and PDF OCR`,
+    totalDuration: 0,
+    summary: `Laporan investigasi dari ${totalFiles} file bukti berhasil dibuat`,
+    metadata: { category: 'investigation' },
   };
   
   return { 
