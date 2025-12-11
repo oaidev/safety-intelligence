@@ -1,5 +1,12 @@
 import { pipeline } from '@huggingface/transformers';
 
+export interface TranscriptionProgress {
+  currentFile: number;
+  totalFiles: number;
+  fileName: string;
+  transcript?: string;
+}
+
 class WhisperService {
   private static instance: WhisperService;
   private transcriber: any = null;
@@ -72,6 +79,44 @@ class WhisperService {
     }
 
     return transcribedText;
+  }
+
+  async transcribeMultipleAudio(
+    files: File[],
+    onProgress?: (progress: TranscriptionProgress) => void
+  ): Promise<string[]> {
+    const transcripts: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (onProgress) {
+        onProgress({
+          currentFile: i + 1,
+          totalFiles: files.length,
+          fileName: file.name,
+        });
+      }
+
+      try {
+        const transcript = await this.transcribeAudio(file);
+        transcripts.push(transcript);
+
+        if (onProgress) {
+          onProgress({
+            currentFile: i + 1,
+            totalFiles: files.length,
+            fileName: file.name,
+            transcript,
+          });
+        }
+      } catch (error) {
+        console.error(`[WhisperService] Failed to transcribe ${file.name}:`, error);
+        transcripts.push(''); // Push empty string for failed transcription
+      }
+    }
+
+    return transcripts;
   }
 
   isModelReady(): boolean {
