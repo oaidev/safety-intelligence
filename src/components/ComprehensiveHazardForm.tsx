@@ -5,12 +5,10 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Label } from '@/components/ui/label';
-import { AlertTriangle, Upload, RotateCcw, Send, Building2, X, Eye, MapPin, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Upload, RotateCcw, Send, Building2, X, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SimilarityCheckDialog } from '@/components/SimilarityCheckDialog';
 import { similarityDetectionService, type SimilarHazardData } from '@/lib/similarityDetectionService';
@@ -251,7 +249,7 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false, compac
       subNonCompliance: '',
       quickAction: '',
       findingDescription: '',
-      latitude: '2.0194521',  // Default to Berau Coal Binungan
+      latitude: '2.0194521',
       longitude: '117.6183817',
     },
   });
@@ -282,7 +280,6 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false, compac
   const handleFormSubmit = async (data: HazardFormData) => {
     console.log('[ComprehensiveHazardForm] Starting similarity check for data:', data);
     
-    // Check for similar hazards before submission
     const { similarHazards: foundHazards, thinkingProcess } = await similarityDetectionService.checkSimilarHazards({
       location: data.location,
       detail_location: data.detailLocation,
@@ -309,7 +306,6 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false, compac
   };
 
   const submitForm = async (data: HazardFormData, markAsDuplicate = false) => {
-    // Convert uploaded files to base64
     let uploadedImage = undefined;
     if (uploadedFiles.length > 0) {
       const file = uploadedFiles[0];
@@ -317,7 +313,6 @@ export function ComprehensiveHazardForm({ onSubmit, isSubmitting = false, compac
       uploadedImage = base64;
     }
 
-    // Combine critical fields for RAG analysis
     const combinedDescription = `
 Ketidaksesuaian: ${data.nonCompliance}
 Sub Ketidaksesuaian: ${data.subNonCompliance}
@@ -356,7 +351,6 @@ Keterangan Lokasi: ${data.locationDescription}
       reader.readAsDataURL(file);
       reader.onload = () => {
         const result = reader.result as string;
-        // Remove the data:image/jpeg;base64, prefix
         const base64Data = result.split(',')[1];
         resolve(base64Data);
       };
@@ -366,7 +360,6 @@ Keterangan Lokasi: ${data.locationDescription}
 
   const handleReset = () => {
     form.reset();
-    // Clean up object URLs before clearing files
     imageUrls.forEach(url => URL.revokeObjectURL(url));
     setUploadedFiles([]);
     setImageUrls([]);
@@ -383,219 +376,46 @@ Keterangan Lokasi: ${data.locationDescription}
   };
 
   const handleDeleteFile = (index: number) => {
-    // Revoke the URL for the deleted file
     if (imageUrls[index]) {
       URL.revokeObjectURL(imageUrls[index]);
     }
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Compact mode styling
+  const labelSize = compact ? 'text-xs' : 'text-sm';
+  const inputSize = compact ? 'h-8 text-sm' : '';
+  const textareaSize = compact ? 'min-h-[60px] text-sm' : 'min-h-[80px]';
+  const gapSize = compact ? 'gap-3' : 'gap-4';
+  const spaceSize = compact ? 'space-y-2' : 'space-y-4';
+
   return (
-    <div className="space-y-6">
+    <div className={compact ? 'space-y-3' : 'space-y-6'}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-          {/* Top Row - Reporter, Observation, PJA */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Reporter Section */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-warning" />
-                  Reporter
-                </CardTitle>
-                <CardDescription>
-                  Informasi pelapor
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="reporterName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nama</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Masukkan nama pelapor" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="reporterPosition"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Posisi/Jabatan</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Masukkan posisi/jabatan" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Observation Details */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Detail Observasi</CardTitle>
-                <CardDescription>
-                  Informasi lokasi dan metode observasi
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="observationTool"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tools Pengamatan</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih tools pengamatan" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {observationTools.map((tool) => (
-                            <SelectItem key={tool} value={tool}>
-                              {tool}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="site"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Site</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih site" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {sites.map((site) => (
-                            <SelectItem key={site} value={site}>
-                              {site}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lokasi</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih lokasi" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {locations.map((location) => (
-                            <SelectItem key={location} value={location}>
-                              {location}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="detailLocation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Detail Lokasi</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih detail lokasi" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {detailLocations.map((detail) => (
-                            <SelectItem key={detail} value={detail}>
-                              {detail}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                 />
-                 
-                 {/* Location Description Field */}
-                 <FormField
-                   control={form.control}
-                   name="locationDescription"
-                   render={({ field }) => (
-                     <FormItem>
-                       <FormLabel>Keterangan Lokasi</FormLabel>
-                       <FormControl>
-                         <Textarea 
-                           placeholder="Masukkan keterangan lokasi yang lebih spesifik"
-                           className="min-h-[80px]"
-                           {...field}
-                         />
-                       </FormControl>
-                       <FormMessage />
-                     </FormItem>
-                   )}
-                 />
-                 
-                 {/* Location Pinpoint Section */}
-                <div className="border rounded-lg p-4 bg-muted/10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      <Label className="text-sm font-medium">Pin Point Lokasi</Label>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`https://www.google.com/maps/place/Berau+Coal+Binungan/@${form.getValues('latitude')},${form.getValues('longitude')},17z`, '_blank')}
-                    >
-                      <ExternalLink className="h-3 w-3 mr-1" />
-                      Buka Maps
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className={compact ? 'space-y-3' : 'space-y-6'}>
+          {/* 2-Column Balanced Layout */}
+          <div className={`grid grid-cols-1 xl:grid-cols-2 ${gapSize}`}>
+            
+            {/* LEFT COLUMN: Reporter + PJA + Photo Upload */}
+            <div className={compact ? 'space-y-3' : 'space-y-4'}>
+              {/* Reporter Section */}
+              <Card className="shadow-card">
+                <CardHeader className={compact ? 'py-3 px-4' : ''}>
+                  <CardTitle className={`flex items-center gap-2 ${compact ? 'text-sm' : ''}`}>
+                    <AlertTriangle className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+                    Reporter
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className={`${spaceSize} ${compact ? 'pt-0' : ''}`}>
+                  <div className={`grid grid-cols-2 ${gapSize}`}>
                     <FormField
                       control={form.control}
-                      name="latitude"
+                      name="reporterName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Latitude</FormLabel>
+                          <FormLabel className={labelSize}>Nama</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field}
-                              type="number"
-                              step="any"
-                              min="-90"
-                              max="90"
-                              placeholder="Contoh: 2.0194521" 
-                              className="text-sm"
-                            />
+                            <Input placeholder="Nama pelapor" className={inputSize} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -603,201 +423,46 @@ Keterangan Lokasi: ${data.locationDescription}
                     />
                     <FormField
                       control={form.control}
-                      name="longitude"
+                      name="reporterPosition"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Longitude</FormLabel>
+                          <FormLabel className={labelSize}>Posisi</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field}
-                              type="number"
-                              step="any"
-                              min="-180"
-                              max="180"
-                              placeholder="Contoh: 117.6183817" 
-                              className="text-sm"
-                            />
+                            <Input placeholder="Posisi/jabatan" className={inputSize} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Default: Berau Coal Binungan. Anda dapat mencari koordinat di Google Maps dan memasukkannya di sini.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* PJA Assignment */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  PJA Assignment
-                </CardTitle>
-                <CardDescription>
-                  Area PJA dan penugasan
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="areaPjaBC"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Area PJA BC</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih area PJA BC" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {areaPjaBC.map((area) => (
-                            <SelectItem key={area} value={area}>
-                              {area}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="areaPjaMitra"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Area PJA Mitra Kerja</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih area PJA mitra" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {areaPjaMitra.map((area) => (
-                            <SelectItem key={area} value={area}>
-                              {area}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Findings Section */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle>Temuan</CardTitle>
-              <CardDescription>
-                Detail temuan dan tindakan yang diperlukan
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Photo Upload */}
-              <div className="space-y-4">
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="photo-upload"
-                  />
-                  <label htmlFor="photo-upload" className="cursor-pointer">
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-medium">Unggah Foto</span> atau drag & drop
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      PNG, JPG hingga 10MB
-                    </p>
-                  </label>
-                </div>
-
-                {/* Image Previews */}
-                {uploadedFiles.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium">Foto yang diunggah ({uploadedFiles.length})</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {uploadedFiles.map((file, index) => (
-                        <div key={index} className="relative group">
-                          <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
-                            <img
-                              src={imageUrls[index]}
-                              alt={`Upload ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              className="h-8 w-8 p-0"
-                              onClick={() => {
-                                window.open(imageUrls[index], '_blank');
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="destructive"
-                              className="h-8 w-8 p-0"
-                              onClick={() => handleDeleteFile(index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2 truncate">
-                            {file.name}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-
-              {/* Form fields in two columns */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+              {/* PJA Assignment */}
+              <Card className="shadow-card">
+                <CardHeader className={compact ? 'py-3 px-4' : ''}>
+                  <CardTitle className={`flex items-center gap-2 ${compact ? 'text-sm' : ''}`}>
+                    <Building2 className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+                    PJA Assignment
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className={`${spaceSize} ${compact ? 'pt-0' : ''}`}>
                   <FormField
                     control={form.control}
-                    name="nonCompliance"
+                    name="areaPjaBC"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Ketidaksesuaian</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            // Reset sub ketidaksesuaian when main category changes
-                            form.setValue('subNonCompliance', '');
-                          }} 
-                          value={field.value}
-                        >
+                        <FormLabel className={labelSize}>Area PJA BC</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-background">
-                              <SelectValue placeholder="Pilih Ketidaksesuaian" />
+                            <SelectTrigger className={inputSize}>
+                              <SelectValue placeholder="Pilih PJA BC" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="bg-background border border-border z-50">
-                            {nonComplianceTypes.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
+                            {areaPjaBC.map((area) => (
+                              <SelectItem key={area} value={area}>
+                                {area}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -808,33 +473,289 @@ Keterangan Lokasi: ${data.locationDescription}
                   />
                   <FormField
                     control={form.control}
-                    name="subNonCompliance"
-                    render={({ field }) => {
-                      const selectedMainCategory = form.watch('nonCompliance');
-                      const subOptions = selectedMainCategory ? nonComplianceData[selectedMainCategory as keyof typeof nonComplianceData] || [] : [];
-                      const isDisabled = !selectedMainCategory;
-                      
-                      return (
-                        <FormItem>
-                          <FormLabel>Sub Ketidaksesuaian</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value}
-                            disabled={isDisabled}
+                    name="areaPjaMitra"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className={labelSize}>Area PJA Mitra</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className={inputSize}>
+                              <SelectValue placeholder="Pilih PJA Mitra" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-background border border-border z-50">
+                            {areaPjaMitra.map((area) => (
+                              <SelectItem key={area} value={area}>
+                                {area}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Photo Upload */}
+              <Card className="shadow-card">
+                <CardHeader className={compact ? 'py-3 px-4' : ''}>
+                  <CardTitle className={compact ? 'text-sm' : ''}>Foto Bukti</CardTitle>
+                </CardHeader>
+                <CardContent className={compact ? 'pt-0' : ''}>
+                  <div className={`border-2 border-dashed border-muted-foreground/25 rounded-lg ${compact ? 'p-3' : 'p-6'} text-center`}>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="photo-upload"
+                    />
+                    <label htmlFor="photo-upload" className="cursor-pointer">
+                      <Upload className={`${compact ? 'h-5 w-5' : 'h-8 w-8'} mx-auto mb-1 text-muted-foreground`} />
+                      <p className={`${compact ? 'text-xs' : 'text-sm'} text-muted-foreground`}>
+                        <span className="font-medium">Unggah Foto</span>
+                      </p>
+                    </label>
+                  </div>
+                  {uploadedFiles.length > 0 && (
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {uploadedFiles.map((file, index) => (
+                        <div key={index} className="relative group aspect-square">
+                          <img
+                            src={imageUrls[index]}
+                            alt={`Upload ${index + 1}`}
+                            className="w-full h-full object-cover rounded border"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="absolute top-1 right-1 h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
+                            onClick={() => handleDeleteFile(index)}
                           >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* RIGHT COLUMN: Detail Observasi + Temuan */}
+            <div className={compact ? 'space-y-3' : 'space-y-4'}>
+              {/* Observation Details */}
+              <Card className="shadow-card">
+                <CardHeader className={compact ? 'py-3 px-4' : ''}>
+                  <CardTitle className={compact ? 'text-sm' : ''}>Detail Observasi</CardTitle>
+                </CardHeader>
+                <CardContent className={`${spaceSize} ${compact ? 'pt-0' : ''}`}>
+                  {/* Row 1: Tools + Site */}
+                  <div className={`grid grid-cols-2 ${gapSize}`}>
+                    <FormField
+                      control={form.control}
+                      name="observationTool"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={labelSize}>Tools</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger className={`bg-background ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                <SelectValue 
-                                  placeholder={
-                                    isDisabled 
-                                      ? "Pilih Ketidaksesuaian terlebih dahulu" 
-                                      : "Pilih Sub Ketidaksesuaian"
-                                  } 
-                                />
+                              <SelectTrigger className={inputSize}>
+                                <SelectValue placeholder="Pilih tools" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border border-border z-50">
-                              {subOptions.map((type) => (
+                              {observationTools.map((tool) => (
+                                <SelectItem key={tool} value={tool}>
+                                  {tool}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="site"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={labelSize}>Site</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className={inputSize}>
+                                <SelectValue placeholder="Pilih site" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border border-border z-50">
+                              {sites.map((site) => (
+                                <SelectItem key={site} value={site}>
+                                  {site}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Row 2: Lokasi + Detail Lokasi */}
+                  <div className={`grid grid-cols-2 ${gapSize}`}>
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={labelSize}>Lokasi</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className={inputSize}>
+                                <SelectValue placeholder="Pilih lokasi" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border border-border z-50">
+                              {locations.map((location) => (
+                                <SelectItem key={location} value={location}>
+                                  {location}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="detailLocation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={labelSize}>Detail Lokasi</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className={inputSize}>
+                                <SelectValue placeholder="Pilih detail" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border border-border z-50">
+                              {detailLocations.map((detail) => (
+                                <SelectItem key={detail} value={detail}>
+                                  {detail}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Keterangan Lokasi */}
+                  <FormField
+                    control={form.control}
+                    name="locationDescription"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className={labelSize}>Keterangan Lokasi</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Keterangan lokasi spesifik"
+                            className={textareaSize}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* GPS Inline */}
+                  <div className={`flex items-end ${gapSize}`}>
+                    <FormField
+                      control={form.control}
+                      name="latitude"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel className={labelSize}>Lat</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field}
+                              type="number"
+                              step="any"
+                              placeholder="2.0194521"
+                              className={inputSize}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="longitude"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel className={labelSize}>Long</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field}
+                              type="number"
+                              step="any"
+                              placeholder="117.6183817"
+                              className={inputSize}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size={compact ? 'sm' : 'default'}
+                      className={compact ? 'h-8' : ''}
+                      onClick={() => window.open(`https://www.google.com/maps/place/@${form.getValues('latitude')},${form.getValues('longitude')},17z`, '_blank')}
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Temuan */}
+              <Card className="shadow-card">
+                <CardHeader className={compact ? 'py-3 px-4' : ''}>
+                  <CardTitle className={compact ? 'text-sm' : ''}>Temuan</CardTitle>
+                </CardHeader>
+                <CardContent className={`${spaceSize} ${compact ? 'pt-0' : ''}`}>
+                  {/* Row: Ketidaksesuaian + Sub */}
+                  <div className={`grid grid-cols-2 ${gapSize}`}>
+                    <FormField
+                      control={form.control}
+                      name="nonCompliance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className={labelSize}>Ketidaksesuaian</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              form.setValue('subNonCompliance', '');
+                            }} 
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className={`bg-background ${inputSize}`}>
+                                <SelectValue placeholder="Pilih" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border border-border z-50">
+                              {nonComplianceTypes.map((type) => (
                                 <SelectItem key={type} value={type}>
                                   {type}
                                 </SelectItem>
@@ -843,24 +764,58 @@ Keterangan Lokasi: ${data.locationDescription}
                           </Select>
                           <FormMessage />
                         </FormItem>
-                      );
-                    }}
-                  />
-                </div>
-                <div className="space-y-4">
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="subNonCompliance"
+                      render={({ field }) => {
+                        const selectedMainCategory = form.watch('nonCompliance');
+                        const subOptions = selectedMainCategory ? nonComplianceData[selectedMainCategory as keyof typeof nonComplianceData] || [] : [];
+                        const isDisabled = !selectedMainCategory;
+                        
+                        return (
+                          <FormItem>
+                            <FormLabel className={labelSize}>Sub</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value}
+                              disabled={isDisabled}
+                            >
+                              <FormControl>
+                                <SelectTrigger className={`bg-background ${inputSize} ${isDisabled ? 'opacity-50' : ''}`}>
+                                  <SelectValue placeholder={isDisabled ? "Pilih dulu" : "Pilih sub"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent className="bg-background border border-border z-50">
+                                {subOptions.map((type) => (
+                                  <SelectItem key={type} value={type}>
+                                    {type}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                  </div>
+
+                  {/* Quick Action */}
                   <FormField
                     control={form.control}
                     name="quickAction"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Quick Action</FormLabel>
+                        <FormLabel className={labelSize}>Quick Action</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className={inputSize}>
                               <SelectValue placeholder="Pilih quick action" />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="bg-background border border-border z-50">
                             {quickActions.map((action) => (
                               <SelectItem key={action} value={action}>
                                 {action}
@@ -872,32 +827,32 @@ Keterangan Lokasi: ${data.locationDescription}
                       </FormItem>
                     )}
                   />
-                </div>
-              </div>
 
-              {/* Finding Description */}
-              <FormField
-                control={form.control}
-                name="findingDescription"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Deskripsi Temuan</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Jelaskan detail temuan keselamatan..."
-                        className="min-h-[120px] resize-none"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                  {/* Deskripsi Temuan */}
+                  <FormField
+                    control={form.control}
+                    name="findingDescription"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className={labelSize}>Deskripsi Temuan</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Jelaskan detail temuan keselamatan..."
+                            className={compact ? 'min-h-[80px] text-sm resize-none' : 'min-h-[120px] resize-none'}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4">
+          <div className={`flex ${gapSize}`}>
             <Button
               type="button"
               variant="outline"
@@ -911,23 +866,23 @@ Keterangan Lokasi: ${data.locationDescription}
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-[2] bg-gradient-primary hover:opacity-90"
             >
               <Send className="h-4 w-4 mr-2" />
-              {isSubmitting ? 'Mengirim...' : 'Kirim Laporan Hazard'}
+              {isSubmitting ? 'Mengirim...' : 'Kirim Laporan'}
             </Button>
           </div>
         </form>
       </Form>
-      
+
       {/* Similarity Check Dialog */}
       <SimilarityCheckDialog
         open={similarityDialogOpen}
         onOpenChange={setSimilarityDialogOpen}
         similarHazards={similarHazards}
-        thinkingProcess={similarityThinkingProcess}
         onContinueSubmission={handleContinueSubmission}
         onEditForm={handleEditForm}
+        thinkingProcess={similarityThinkingProcess}
       />
     </div>
   );

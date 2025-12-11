@@ -254,11 +254,11 @@ export function HybridHazardAnalyzer({ splitView = false }: HybridHazardAnalyzer
   };
 
   if (splitView) {
-    // Split View Layout for Frontliner
+    // Split View Layout for Frontliner - Form left, Results right (sticky)
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4">
         {/* Left: Form */}
-        <div className="space-y-4">
+        <div className="min-w-0">
           <ComprehensiveHazardForm 
             onSubmit={handleActualSubmission}
             isSubmitting={isAnalyzing}
@@ -266,22 +266,31 @@ export function HybridHazardAnalyzer({ splitView = false }: HybridHazardAnalyzer
           />
         </div>
 
-        {/* Right: Results */}
-        <div className="space-y-4">
+        {/* Right: Results - Sticky sidebar */}
+        <div className="space-y-3 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
           {isAnalyzing || isScoring ? (
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <AnalysisLoadingAnimation />
               </CardContent>
             </Card>
           ) : (
             <>
+              {!scoringAnalysis && !results && (
+                <Card>
+                  <CardContent className="p-6 text-center text-muted-foreground">
+                    <Sparkles className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Hasil analisis akan muncul di sini setelah form disubmit</p>
+                  </CardContent>
+                </Card>
+              )}
+              
               {scoringAnalysis && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Kualitas Laporan</CardTitle>
+                  <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-sm font-medium">Kualitas Laporan</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-0 px-4 pb-4">
                     <HazardScoring 
                       analysis={scoringAnalysis}
                       onImproveReport={handleImproveReport}
@@ -294,10 +303,10 @@ export function HybridHazardAnalyzer({ splitView = false }: HybridHazardAnalyzer
               
               {results && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Analisis Knowledge Base</CardTitle>
+                  <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-sm font-medium">Analisis Knowledge Base</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-0 px-4 pb-4">
                     <AnalysisResults 
                       results={results} 
                       isAnalyzing={isAnalyzing}
