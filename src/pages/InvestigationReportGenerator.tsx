@@ -4,12 +4,13 @@ import { InvestigationMultiInputForm, type EvidenceFiles } from '@/components/In
 import { InvestigationProcessingPipeline, type ProcessingStep, type ThinkingMessage } from '@/components/InvestigationProcessingPipeline';
 import { InvestigationReportDisplay } from '@/components/InvestigationReportDisplay';
 import { whisperService } from '@/lib/whisperService';
-import { pdfProcessingService } from '@/lib/pdfProcessingService';
 import { documentProcessingService } from '@/lib/documentProcessingService';
 import { investigationContextService, type InvestigationContext, type ProcessedAudio, type ProcessedDocument, type ProcessedImage, type ProcessedVideo } from '@/lib/investigationContextService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ThinkingProcessViewer, type ThinkingProcess } from '@/components/ThinkingProcessViewer';
+
+const SUPABASE_URL = 'https://shdhbfvpprqhtooqluld.supabase.co';
 
 const InvestigationReportGenerator = () => {
   const [reportData, setReportData] = useState('');
@@ -48,7 +49,7 @@ const InvestigationReportGenerator = () => {
     });
   };
 
-  const handleGenerate = async (files: EvidenceFiles) => {
+  const handleGenerateWithSSE = async (files: EvidenceFiles) => {
     setIsGenerating(true);
     setShowPipeline(true);
     setReportData('');
@@ -96,11 +97,9 @@ const InvestigationReportGenerator = () => {
     setProcessingSteps(steps);
 
     let context = investigationContextService.createEmptyContext();
-    const totalSteps = steps.length;
-    let completedSteps = 0;
 
     try {
-      // Step 1: Process Audio Files
+      // Step 1: Process Audio Files locally if possible
       if (files.audioFiles.length > 0) {
         updateStep('audio', { status: 'processing' });
         addThinkingMessage('Memulai transkripsi audio interview...');
@@ -110,7 +109,6 @@ const InvestigationReportGenerator = () => {
           let transcript = '';
           let processedLocally = false;
 
-          // Update substep to processing
           setProcessingSteps(prev => prev.map(step => 
             step.id === 'audio' ? {
               ...step,
@@ -120,7 +118,6 @@ const InvestigationReportGenerator = () => {
             } : step
           ));
 
-          // Try local Whisper first
           if (whisperService.isModelReady()) {
             try {
               addThinkingMessage(`Menggunakan Whisper lokal untuk ${file.name}...`);
@@ -137,14 +134,8 @@ const InvestigationReportGenerator = () => {
             processedLocally,
           };
 
-          // If local failed or not ready, we'll send raw audio to edge function
-          if (!processedLocally) {
-            audio.transcript = ''; // Will be processed server-side
-          }
-
           context = investigationContextService.addAudio(context, audio);
 
-          // Update substep to completed
           setProcessingSteps(prev => prev.map(step => 
             step.id === 'audio' ? {
               ...step,
@@ -156,11 +147,9 @@ const InvestigationReportGenerator = () => {
         }
 
         updateStep('audio', { status: 'completed', details: `${files.audioFiles.length} audio processed` });
-        completedSteps++;
-        setOverallProgress(Math.round((completedSteps / totalSteps) * 100));
       }
 
-      // Step 2: Process Documents
+      // Step 2: Process Documents (DOCX/TXT locally, PDF to server)
       if (files.documentFiles.length > 0) {
         updateStep('documents', { status: 'processing' });
         addThinkingMessage('Mengekstrak konten dokumen...');
@@ -172,7 +161,6 @@ const InvestigationReportGenerator = () => {
           let processedLocally = false;
           const format = documentProcessingService.getFileFormat(file);
 
-          // Update substep to processing
           setProcessingSteps(prev => prev.map(step => 
             step.id === 'documents' ? {
               ...step,
@@ -183,13 +171,7 @@ const InvestigationReportGenerator = () => {
           ));
 
           try {
-            if (format === 'pdf') {
-              addThinkingMessage(`Mengekstrak teks dari PDF: ${file.name}...`);
-              const result = await pdfProcessingService.extractText(file);
-              content = result.text;
-              wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
-              processedLocally = !pdfProcessingService.isScannedPDF(result);
-            } else if (format === 'docx') {
+            if (format === 'docx') {
               addThinkingMessage(`Mengekstrak teks dari DOCX: ${file.name}...`);
               const result = await documentProcessingService.extractFromDocx(file);
               content = result.text;
@@ -200,6 +182,10 @@ const InvestigationReportGenerator = () => {
               content = result.text;
               wordCount = result.wordCount;
               processedLocally = true;
+            } else if (format === 'pdf') {
+              addThinkingMessage(`PDF akan diproses via OCR server: ${file.name}...`);
+              // PDF will be processed server-side with Gemini Vision
+              processedLocally = false;
             }
           } catch (error) {
             console.error(`[InvestigationReport] Failed to process ${file.name}:`, error);
@@ -215,7 +201,6 @@ const InvestigationReportGenerator = () => {
 
           context = investigationContextService.addDocument(context, doc);
 
-          // Update substep to completed
           setProcessingSteps(prev => prev.map(step => 
             step.id === 'documents' ? {
               ...step,
@@ -226,12 +211,10 @@ const InvestigationReportGenerator = () => {
           ));
         }
 
-        updateStep('documents', { status: 'completed', details: `${context.summary.totalWordCount} words extracted` });
-        completedSteps++;
-        setOverallProgress(Math.round((completedSteps / totalSteps) * 100));
+        updateStep('documents', { status: 'completed', details: `${context.summary.totalWordCount} words extracted locally` });
       }
 
-      // Step 3: Process Images (convert to base64 for AI)
+      // Step 3: Prepare Images
       if (files.imageFiles.length > 0) {
         updateStep('images', { status: 'processing' });
         addThinkingMessage('Menyiapkan foto bukti untuk analisis AI...');
@@ -246,11 +229,9 @@ const InvestigationReportGenerator = () => {
         }
 
         updateStep('images', { status: 'completed', details: `${files.imageFiles.length} images ready` });
-        completedSteps++;
-        setOverallProgress(Math.round((completedSteps / totalSteps) * 100));
       }
 
-      // Step 4: Process Videos (convert to base64 for AI)
+      // Step 4: Prepare Videos
       if (files.videoFiles.length > 0) {
         updateStep('videos', { status: 'processing' });
         addThinkingMessage('Menyiapkan video untuk analisis AI...');
@@ -264,12 +245,10 @@ const InvestigationReportGenerator = () => {
           context = investigationContextService.addVideo(context, video);
         }
 
-        updateStep('videos', { status: 'completed', details: `${files.videoFiles.length} videos ready` });
-        completedSteps++;
-        setOverallProgress(Math.round((completedSteps / totalSteps) * 100));
+        updateStep('videos', { status: 'completed', details: `${files.videoFiles.length} videos ready for AI analysis` });
       }
 
-      // Step 5: Generate Report via Edge Function
+      // Step 5: Call Edge Function with SSE
       updateStep('analysis', { status: 'processing' });
       addThinkingMessage('Mengirim data ke AI untuk analisis komprehensif...');
 
@@ -283,47 +262,123 @@ const InvestigationReportGenerator = () => {
         }))
       );
 
-      const documentData = files.documentFiles.map((file, idx) => ({
-        name: file.name,
-        content: context.documents[idx].content,
-        format: context.documents[idx].format,
-        processedLocally: context.documents[idx].processedLocally,
-      }));
+      // Include base64 for PDFs that need server-side OCR
+      const documentData = await Promise.all(
+        files.documentFiles.map(async (file, idx) => {
+          const docContext = context.documents[idx];
+          return {
+            name: file.name,
+            content: docContext.content,
+            format: docContext.format,
+            base64: docContext.format === 'pdf' && !docContext.processedLocally ? await fileToBase64(file) : undefined,
+            processedLocally: docContext.processedLocally,
+          };
+        })
+      );
 
-      addThinkingMessage('AI menganalisis korelasi antara interview dan bukti...');
-
-      const { data, error } = await supabase.functions.invoke('generate-investigation-report', {
-        body: {
+      // Use SSE streaming
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-investigation-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           audioFiles: audioData,
           imageFiles: context.images,
           documentFiles: documentData,
           videoFiles: context.videos,
           textContext: investigationContextService.buildPromptContext(context),
-        }
+          stream: true,
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate report');
+      }
 
-      updateStep('analysis', { status: 'completed' });
-      completedSteps++;
-      setOverallProgress(100);
+      // Process SSE stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      setReportData(data.report);
-      setTrackingId(data.tracking_id || '');
-      
-      if (data.thinkingProcess) {
-        setThinkingProcess(data.thinkingProcess);
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              const eventType = line.slice(7);
+              continue;
+            }
+            
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.step && data.message) {
+                  // Progress update
+                  addThinkingMessage(data.message);
+                  
+                  // Update step status based on progress
+                  if (data.step === 'audio') {
+                    updateStep('audio', { status: 'processing' });
+                  } else if (data.step === 'documents') {
+                    updateStep('documents', { status: 'processing' });
+                  } else if (data.step === 'videos') {
+                    updateStep('videos', { status: 'processing' });
+                  } else if (data.step === 'analysis') {
+                    updateStep('analysis', { status: 'processing' });
+                  }
+                  
+                  // Estimate progress
+                  const progressMap: Record<string, number> = {
+                    'start': 10,
+                    'audio': 30,
+                    'documents': 50,
+                    'videos': 70,
+                    'analysis': 85,
+                    'complete': 100,
+                  };
+                  setOverallProgress(progressMap[data.step] || 50);
+                }
+                
+                if (data.report) {
+                  // Final result
+                  updateStep('analysis', { status: 'completed' });
+                  setOverallProgress(100);
+                  setReportData(data.report);
+                  setTrackingId(data.tracking_id || '');
+                  
+                  if (data.thinkingProcess) {
+                    setThinkingProcess(data.thinkingProcess);
+                  }
+                }
+                
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+              } catch (e) {
+                // Ignore parse errors for partial data
+              }
+            }
+          }
+        }
       }
 
       toast({
         title: 'Report generated!',
-        description: 'You can now edit and export the report',
+        description: 'Investigation report with video analysis and PDF OCR complete',
       });
 
     } catch (error: any) {
       console.error('[InvestigationReport] Error:', error);
       
-      // Mark current processing step as error
       setProcessingSteps(prev => prev.map(step => 
         step.status === 'processing' ? { ...step, status: 'error' } : step
       ));
@@ -344,7 +399,7 @@ const InvestigationReportGenerator = () => {
         <div className="text-center mb-6">
           <h1 className="text-2xl lg:text-3xl font-bold mb-1">Investigation Report Generator</h1>
           <p className="text-muted-foreground text-sm lg:text-base">
-            Generate comprehensive investigation report from multiple evidence sources
+            Generate comprehensive investigation report from audio, video, images, and documents
           </p>
         </div>
 
@@ -352,7 +407,7 @@ const InvestigationReportGenerator = () => {
           {/* Input Section */}
           <div className="space-y-4">
             <InvestigationMultiInputForm
-              onGenerate={handleGenerate}
+              onGenerate={handleGenerateWithSSE}
               isGenerating={isGenerating}
             />
           </div>
