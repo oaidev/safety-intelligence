@@ -49,6 +49,47 @@ const InvestigationReportGenerator = () => {
     });
   };
 
+  // Compress image before sending to server
+  const compressImage = (file: File, maxWidth = 1024, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      img.onload = () => {
+        let { width, height } = img;
+        
+        // Scale down if needed
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Get compressed base64
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64 = dataUrl.split(',')[1];
+        resolve(base64);
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Calculate total payload size
+  const estimatePayloadSize = (files: EvidenceFiles): number => {
+    let totalSize = 0;
+    files.audioFiles.forEach(f => totalSize += f.size);
+    files.imageFiles.forEach(f => totalSize += f.size * 0.3); // Compressed estimate
+    files.documentFiles.forEach(f => totalSize += f.size);
+    files.videoFiles.forEach(f => totalSize += f.size);
+    return totalSize;
+  };
+
   const handleGenerateWithSSE = async (files: EvidenceFiles) => {
     setIsGenerating(true);
     setShowPipeline(true);
@@ -95,6 +136,21 @@ const InvestigationReportGenerator = () => {
     });
     
     setProcessingSteps(steps);
+
+    // Check estimated payload size
+    const estimatedSize = estimatePayloadSize(files);
+    const MAX_PAYLOAD_SIZE = 50 * 1024 * 1024; // 50MB limit
+    
+    if (estimatedSize > MAX_PAYLOAD_SIZE) {
+      toast({
+        title: 'Payload terlalu besar',
+        description: `Total file ~${Math.round(estimatedSize / (1024 * 1024))}MB melebihi batas 50MB. Kurangi ukuran atau jumlah file.`,
+        variant: 'destructive',
+      });
+      setIsGenerating(false);
+      setShowPipeline(false);
+      return;
+    }
 
     let context = investigationContextService.createEmptyContext();
 
@@ -214,13 +270,14 @@ const InvestigationReportGenerator = () => {
         updateStep('documents', { status: 'completed', details: `${context.summary.totalWordCount} words extracted locally` });
       }
 
-      // Step 3: Prepare Images
+      // Step 3: Prepare Images (with compression)
       if (files.imageFiles.length > 0) {
         updateStep('images', { status: 'processing' });
-        addThinkingMessage('Menyiapkan foto bukti untuk analisis AI...');
+        addThinkingMessage('Mengompresi dan menyiapkan foto bukti...');
 
         for (const file of files.imageFiles) {
-          const base64 = await fileToBase64(file);
+          // Compress image to reduce payload size
+          const base64 = await compressImage(file, 1024, 0.8);
           const image: ProcessedImage = {
             fileName: file.name,
             base64,
@@ -228,15 +285,36 @@ const InvestigationReportGenerator = () => {
           context = investigationContextService.addImage(context, image);
         }
 
-        updateStep('images', { status: 'completed', details: `${files.imageFiles.length} images ready` });
+        updateStep('images', { status: 'completed', details: `${files.imageFiles.length} images compressed & ready` });
       }
 
-      // Step 4: Prepare Videos
+      // Step 4: Prepare Videos (skip if too large)
       if (files.videoFiles.length > 0) {
         updateStep('videos', { status: 'processing' });
-        addThinkingMessage('Menyiapkan video untuk analisis AI...');
-
+        
+        const validVideos: File[] = [];
+        const skippedVideos: string[] = [];
+        const VIDEO_MAX_SIZE = 15 * 1024 * 1024; // 15MB per video
+        
         for (const file of files.videoFiles) {
+          if (file.size > VIDEO_MAX_SIZE) {
+            skippedVideos.push(file.name);
+            addThinkingMessage(`⚠️ Video ${file.name} terlalu besar (${Math.round(file.size / (1024 * 1024))}MB), dilewati`);
+          } else {
+            validVideos.push(file);
+          }
+        }
+
+        if (skippedVideos.length > 0) {
+          toast({
+            title: 'Beberapa video dilewati',
+            description: `${skippedVideos.length} video > 15MB tidak diproses untuk menghindari memory error`,
+            variant: 'default',
+          });
+        }
+
+        for (const file of validVideos) {
+          addThinkingMessage(`Menyiapkan video: ${file.name}...`);
           const base64 = await fileToBase64(file);
           const video: ProcessedVideo = {
             fileName: file.name,
@@ -245,7 +323,11 @@ const InvestigationReportGenerator = () => {
           context = investigationContextService.addVideo(context, video);
         }
 
-        updateStep('videos', { status: 'completed', details: `${files.videoFiles.length} videos ready for AI analysis` });
+        const details = validVideos.length > 0 
+          ? `${validVideos.length} videos ready` + (skippedVideos.length > 0 ? `, ${skippedVideos.length} skipped` : '')
+          : 'No videos processed (all too large)';
+        
+        updateStep('videos', { status: 'completed', details });
       }
 
       // Step 5: Call Edge Function with SSE
@@ -383,9 +465,21 @@ const InvestigationReportGenerator = () => {
         step.status === 'processing' ? { ...step, status: 'error' } : step
       ));
 
+      // Check for specific error types
+      let errorMessage = error.message || 'Failed to generate report';
+      let errorTitle = 'Error generating report';
+      
+      if (errorMessage.toLowerCase().includes('memory')) {
+        errorTitle = 'Memory limit exceeded';
+        errorMessage = 'File terlalu besar untuk diproses. Coba kurangi ukuran video atau gunakan video yang lebih pendek.';
+      } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+        errorTitle = 'Rate limit exceeded';
+        errorMessage = 'Terlalu banyak request. Tunggu beberapa saat dan coba lagi.';
+      }
+
       toast({
-        title: 'Error generating report',
-        description: error.message || 'Failed to generate report',
+        title: errorTitle,
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

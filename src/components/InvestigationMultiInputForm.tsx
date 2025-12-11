@@ -27,6 +27,7 @@ interface FileSection {
   maxSizeLabel: string;
   formats: string;
   required?: boolean;
+  sizeWarning?: string;
 }
 
 const FILE_SECTIONS: FileSection[] = [
@@ -45,8 +46,8 @@ const FILE_SECTIONS: FileSection[] = [
     label: 'Foto Bukti',
     icon: ImageIcon,
     accept: 'image/jpeg,image/jpg,image/png,image/webp',
-    maxSize: 20 * 1024 * 1024,
-    maxSizeLabel: '20MB',
+    maxSize: 10 * 1024 * 1024,
+    maxSizeLabel: '10MB',
     formats: 'JPG, PNG, WebP',
   },
   {
@@ -63,9 +64,10 @@ const FILE_SECTIONS: FileSection[] = [
     label: 'Video Bukti',
     icon: Video,
     accept: 'video/mp4,video/quicktime,.mp4,.mov',
-    maxSize: 200 * 1024 * 1024,
-    maxSizeLabel: '200MB',
+    maxSize: 20 * 1024 * 1024,
+    maxSizeLabel: '20MB',
     formats: 'MP4, MOV',
+    sizeWarning: 'Video besar membutuhkan lebih banyak waktu dan memory',
   },
 ];
 
