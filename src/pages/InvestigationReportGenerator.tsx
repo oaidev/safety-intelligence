@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { InvestigationMultiInputForm, type EvidenceFiles } from '@/components/InvestigationMultiInputForm';
 import { InvestigationProcessingPipeline, type ProcessingStep, type ThinkingMessage } from '@/components/InvestigationProcessingPipeline';
-import { InvestigationReportDisplay } from '@/components/InvestigationReportDisplay';
+import { InvestigationReportDisplay, type ReportField } from '@/components/InvestigationReportDisplay';
 import { whisperService } from '@/lib/whisperService';
 import { documentProcessingService } from '@/lib/documentProcessingService';
 import { investigationContextService, type InvestigationContext, type ProcessedAudio, type ProcessedDocument, type ProcessedImage, type ProcessedVideo } from '@/lib/investigationContextService';
@@ -13,7 +13,9 @@ import { ThinkingProcessViewer, type ThinkingProcess } from '@/components/Thinki
 const SUPABASE_URL = 'https://shdhbfvpprqhtooqluld.supabase.co';
 
 const InvestigationReportGenerator = () => {
-  const [reportData, setReportData] = useState('');
+  const [reportData, setReportData] = useState<ReportField[] | string | null>(null);
+  const [reportRaw, setReportRaw] = useState<string>('');
+  const [reportFormat, setReportFormat] = useState<'json' | 'text'>('text');
   const [isGenerating, setIsGenerating] = useState(false);
   const [trackingId, setTrackingId] = useState('');
   const [thinkingProcess, setThinkingProcess] = useState<ThinkingProcess | null>(null);
@@ -93,7 +95,9 @@ const InvestigationReportGenerator = () => {
   const handleGenerateWithSSE = async (files: EvidenceFiles) => {
     setIsGenerating(true);
     setShowPipeline(true);
-    setReportData('');
+    setReportData(null);
+    setReportRaw('');
+    setReportFormat('text');
     setThinkingMessages([]);
     setOverallProgress(0);
 
@@ -434,7 +438,17 @@ const InvestigationReportGenerator = () => {
                   // Final result
                   updateStep('analysis', { status: 'completed' });
                   setOverallProgress(100);
-                  setReportData(data.report);
+                  
+                  // Handle both JSON and text format
+                  if (data.reportFormat === 'json' && Array.isArray(data.report)) {
+                    setReportData(data.report);
+                    setReportFormat('json');
+                  } else {
+                    setReportData(data.report);
+                    setReportFormat('text');
+                  }
+                  
+                  setReportRaw(data.reportRaw || '');
                   setTrackingId(data.tracking_id || '');
                   
                   if (data.thinkingProcess) {
@@ -513,7 +527,7 @@ const InvestigationReportGenerator = () => {
                 steps={processingSteps}
                 thinkingMessages={thinkingMessages}
                 overallProgress={overallProgress}
-                isComplete={!isGenerating && reportData.length > 0}
+                isComplete={!isGenerating && reportData !== null}
               />
             )}
 
@@ -524,6 +538,8 @@ const InvestigationReportGenerator = () => {
                 )}
                 <InvestigationReportDisplay
                   reportData={reportData}
+                  reportFormat={reportFormat}
+                  reportRaw={reportRaw}
                   trackingId={trackingId}
                   onUpdate={(newReport) => setReportData(newReport)}
                 />
@@ -531,7 +547,7 @@ const InvestigationReportGenerator = () => {
             ) : !isGenerating && (
               <Card className="p-8 text-center border-dashed min-h-64 flex items-center justify-center">
                 <p className="text-muted-foreground">
-                  Your investigation report will appear here after generation
+                  Laporan investigasi akan muncul di sini setelah proses selesai
                 </p>
               </Card>
             )}

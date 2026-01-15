@@ -529,6 +529,43 @@ Buat laporan investigasi dengan format:
   console.log('[InvestigationReport] Report generated successfully, length:', reportText.length);
   onProgress('complete', 'Laporan investigasi berhasil dibuat!');
 
+  // Parse JSON from AI response
+  let reportData: any[] | null = null;
+  let reportFormat: 'json' | 'text' = 'text';
+  
+  try {
+    // Remove markdown code blocks if present
+    let jsonString = reportText.trim();
+    
+    // Try to extract JSON from markdown code blocks
+    const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonString = jsonMatch[1].trim();
+    }
+    
+    // Try to find JSON array in the text
+    const arrayMatch = jsonString.match(/\[[\s\S]*\]/);
+    if (arrayMatch) {
+      jsonString = arrayMatch[0];
+    }
+    
+    reportData = JSON.parse(jsonString);
+    
+    // Validate it's an array with expected structure
+    if (Array.isArray(reportData) && reportData.length > 0 && reportData[0].Section) {
+      reportFormat = 'json';
+      console.log('[InvestigationReport] Successfully parsed JSON report with', reportData.length, 'fields');
+    } else {
+      console.warn('[InvestigationReport] Parsed JSON but unexpected structure, falling back to text');
+      reportData = null;
+      reportFormat = 'text';
+    }
+  } catch (e) {
+    console.warn('[InvestigationReport] Failed to parse JSON response, using text format:', e);
+    reportData = null;
+    reportFormat = 'text';
+  }
+
   // Build thinking process - simplified format matching ThinkingProcessViewer interface
   const totalFiles = (audioFiles?.length || 0) + (documentFiles?.length || 0) + (imageFiles?.length || 0) + (videoFiles?.length || 0);
   
@@ -573,10 +610,10 @@ Buat laporan investigasi dengan format:
       {
         step: 5,
         name: 'Laporan Dibuat',
-        description: `Laporan investigasi ${reportText.length.toLocaleString()} karakter`,
+        description: `Laporan investigasi ${reportFormat === 'json' ? (reportData?.length || 0) + ' field' : reportText.length.toLocaleString() + ' karakter'}`,
         timestamp: Date.now(),
         duration: 0,
-        details: { message: 'Laporan investigasi berhasil dibuat' },
+        details: { message: `Laporan investigasi berhasil dibuat (format: ${reportFormat === 'json' ? 'JSON field-based' : 'text'})` },
         status: 'success' as const,
       },
     ],
@@ -586,7 +623,9 @@ Buat laporan investigasi dengan format:
   };
   
   return { 
-    report: reportText,
+    report: reportFormat === 'json' ? reportData : reportText,
+    reportRaw: reportText,
+    reportFormat,
     generated_at: new Date().toISOString(),
     evidence_summary: {
       audio_count: audioFiles?.length || 0,
