@@ -47,7 +47,7 @@ export function InvestigationReportDisplay({
   const [editValue, setEditValue] = useState('');
   const { toast } = useToast();
 
-  // Group fields by section
+  // Group fields by section, then by sub-groups within sections
   const sections = useMemo(() => {
     if (typeof reportData === 'string' || !Array.isArray(reportData)) {
       return {};
@@ -59,6 +59,46 @@ export function InvestigationReportDisplay({
       return acc;
     }, {} as Record<string, ReportField[]>);
   }, [reportData]);
+
+  // Detect sub-groups within sections (e.g., Korban/Saksi in Informasi Karyawan)
+  const getSubGroups = (sectionFields: ReportField[]): { label: string; fields: ReportField[] }[] => {
+    const groups: { label: string; fields: ReportField[] }[] = [];
+    let currentGroup: { label: string; fields: ReportField[] } | null = null;
+    
+    // Fields that indicate a new sub-group
+    const groupMarkers = ['Kategori', 'Layer'];
+    
+    sectionFields.forEach((field) => {
+      const isMarker = groupMarkers.some(marker => field.Field.includes(marker));
+      
+      if (isMarker && field.Value) {
+        // Start a new group
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+        currentGroup = { label: field.Value, fields: [field] };
+      } else if (currentGroup) {
+        currentGroup.fields.push(field);
+      } else {
+        // No group yet, create default
+        if (groups.length === 0) {
+          groups.push({ label: '', fields: [] });
+        }
+        groups[groups.length - 1].fields.push(field);
+      }
+    });
+    
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+    
+    // If only one group with no label, return flat
+    if (groups.length === 1 && !groups[0].label) {
+      return [{ label: '', fields: sectionFields }];
+    }
+    
+    return groups;
+  };
 
   const sortedSections = useMemo(() => {
     const keys = Object.keys(sections);
@@ -240,75 +280,101 @@ export function InvestigationReportDisplay({
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <CardContent className="pt-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[180px]">Field</TableHead>
-                            <TableHead>Value</TableHead>
-                            <TableHead className="w-[280px]">Reason</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {sections[sectionName].map((field, idx) => {
-                            const isEditingThis = editingField?.section === sectionName && editingField?.fieldIndex === idx;
-                            
-                            return (
-                              <TableRow key={idx}>
-                                <TableCell className="font-medium align-top">
-                                  {field.Field}
-                                </TableCell>
-                                <TableCell className="align-top">
-                                  {isEditingThis ? (
-                                    <div className="flex gap-2">
-                                      <Textarea
-                                        value={editValue}
-                                        onChange={(e) => setEditValue(e.target.value)}
-                                        className="min-h-[80px] flex-1"
-                                        autoFocus
-                                      />
-                                      <div className="flex flex-col gap-1">
-                                        <Button 
-                                          size="icon" 
-                                          variant="default"
-                                          className="h-8 w-8"
-                                          onClick={saveFieldEdit}
-                                        >
-                                          <Check className="h-4 w-4" />
-                                        </Button>
-                                        <Button 
-                                          size="icon" 
-                                          variant="outline"
-                                          className="h-8 w-8"
-                                          onClick={cancelEdit}
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="group flex items-start gap-2">
-                                      <span className="whitespace-pre-wrap flex-1">
-                                        {field.Value || '-'}
-                                      </span>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                        onClick={() => startEditField(sectionName, idx, field.Value || '')}
-                                      >
-                                        <Edit className="h-3 w-3" />
-                                      </Button>
-                                    </div>
+                      {(() => {
+                        const subGroups = getSubGroups(sections[sectionName]);
+                        const hasMultipleGroups = subGroups.length > 1 || (subGroups.length === 1 && subGroups[0].label);
+                        
+                        return (
+                          <div className="space-y-4">
+                            {subGroups.map((group, groupIdx) => (
+                              <div key={groupIdx}>
+                                {hasMultipleGroups && group.label && (
+                                  <div className="flex items-center gap-2 mb-2 py-2 border-b border-dashed">
+                                    <Badge variant="outline" className="text-xs font-medium">
+                                      {group.label === 'Korban' ? '👤' : group.label === 'Saksi' ? '👁' : '📋'} {group.label}
+                                    </Badge>
+                                  </div>
+                                )}
+                                <Table>
+                                  {groupIdx === 0 && (
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-[160px]">Field</TableHead>
+                                        <TableHead className="w-1/2">Value</TableHead>
+                                        <TableHead className="w-[35%]">Reason</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
                                   )}
-                                </TableCell>
-                                <TableCell className="align-top text-sm text-muted-foreground">
-                                  {field.Reason || '-'}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
+                                  <TableBody>
+                                    {group.fields.map((field, idx) => {
+                                      // Calculate global index for editing
+                                      const globalIdx = sections[sectionName].findIndex(
+                                        f => f.Field === field.Field && f.Value === field.Value
+                                      );
+                                      const isEditingThis = editingField?.section === sectionName && editingField?.fieldIndex === globalIdx;
+                                      
+                                      return (
+                                        <TableRow key={idx}>
+                                          <TableCell className="font-medium align-top">
+                                            {field.Field}
+                                          </TableCell>
+                                          <TableCell className="align-top">
+                                            {isEditingThis ? (
+                                              <div className="flex gap-2">
+                                                <Textarea
+                                                  value={editValue}
+                                                  onChange={(e) => setEditValue(e.target.value)}
+                                                  className="min-h-[80px] flex-1"
+                                                  autoFocus
+                                                />
+                                                <div className="flex flex-col gap-1">
+                                                  <Button 
+                                                    size="icon" 
+                                                    variant="default"
+                                                    className="h-8 w-8"
+                                                    onClick={saveFieldEdit}
+                                                  >
+                                                    <Check className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button 
+                                                    size="icon" 
+                                                    variant="outline"
+                                                    className="h-8 w-8"
+                                                    onClick={cancelEdit}
+                                                  >
+                                                    <X className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <div className="group flex items-start gap-2">
+                                                <span className="whitespace-pre-wrap flex-1">
+                                                  {field.Value || '-'}
+                                                </span>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                  onClick={() => startEditField(sectionName, globalIdx, field.Value || '')}
+                                                >
+                                                  <Edit className="h-3 w-3" />
+                                                </Button>
+                                              </div>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="align-top text-sm text-muted-foreground">
+                                            {field.Reason || '-'}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </CollapsibleContent>
                 </Card>
