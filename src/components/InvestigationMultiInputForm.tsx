@@ -54,10 +54,10 @@ const FILE_SECTIONS: FileSection[] = [
     id: 'documentFiles',
     label: 'Dokumen',
     icon: FileText,
-    accept: '.pdf,.docx,.doc,.txt',
+    accept: '.pdf,.docx,.doc,.txt,.xlsx,.xls',
     maxSize: 50 * 1024 * 1024,
     maxSizeLabel: '50MB',
-    formats: 'PDF, DOCX, DOC, TXT',
+    formats: 'PDF, DOCX, DOC, TXT, XLSX, XLS',
   },
   {
     id: 'videoFiles',

@@ -242,6 +242,12 @@ const InvestigationReportGenerator = () => {
               content = result.text;
               wordCount = result.wordCount;
               processedLocally = true;
+            } else if (format === 'xlsx' || format === 'xls') {
+              addThinkingMessage(`Mengekstrak data dari Excel: ${file.name}...`);
+              const result = await documentProcessingService.extractFromExcel(file);
+              content = result.text;
+              wordCount = result.wordCount;
+              processedLocally = true;
             } else if (format === 'pdf') {
               addThinkingMessage(`PDF akan diproses via OCR server: ${file.name}...`);
               // PDF will be processed server-side with Gemini Vision

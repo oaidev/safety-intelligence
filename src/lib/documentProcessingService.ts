@@ -1,9 +1,10 @@
 import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
 
 export interface DocumentExtractionResult {
   text: string;
   wordCount: number;
-  format: 'docx' | 'doc' | 'txt';
+  format: 'docx' | 'doc' | 'txt' | 'xlsx' | 'xls';
 }
 
 class DocumentProcessingService {
@@ -47,6 +48,35 @@ class DocumentProcessingService {
     };
   }
 
+  async extractFromExcel(file: File): Promise<DocumentExtractionResult> {
+    console.log('[DocumentProcessingService] Extracting Excel:', file.name);
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    
+    let fullText = '';
+    
+    // Iterate all sheets and convert to CSV for AI readability
+    workbook.SheetNames.forEach((sheetName) => {
+      const sheet = workbook.Sheets[sheetName];
+      const csv = XLSX.utils.sheet_to_csv(sheet);
+      fullText += `\n=== Sheet: ${sheetName} ===\n${csv}\n`;
+    });
+    
+    const text = fullText.trim();
+    const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
+    
+    console.log('[DocumentProcessingService] Excel extracted. Sheets:', workbook.SheetNames.length, 'Words:', wordCount);
+    
+    const ext = file.name.toLowerCase().split('.').pop();
+    
+    return {
+      text,
+      wordCount,
+      format: ext === 'xls' ? 'xls' : 'xlsx',
+    };
+  }
+
   async extractAsBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -59,18 +89,20 @@ class DocumentProcessingService {
     });
   }
 
-  getFileFormat(file: File): 'docx' | 'doc' | 'txt' | 'pdf' | 'unknown' {
+  getFileFormat(file: File): 'docx' | 'doc' | 'txt' | 'pdf' | 'xlsx' | 'xls' | 'unknown' {
     const ext = file.name.toLowerCase().split('.').pop();
     if (ext === 'docx') return 'docx';
     if (ext === 'doc') return 'doc';
     if (ext === 'txt') return 'txt';
     if (ext === 'pdf') return 'pdf';
+    if (ext === 'xlsx') return 'xlsx';
+    if (ext === 'xls') return 'xls';
     return 'unknown';
   }
 
   canProcessLocally(file: File): boolean {
     const format = this.getFileFormat(file);
-    return format === 'docx' || format === 'txt';
+    return ['docx', 'txt', 'xlsx', 'xls'].includes(format);
   }
 }
 
