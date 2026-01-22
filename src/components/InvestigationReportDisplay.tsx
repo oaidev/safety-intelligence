@@ -8,13 +8,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Download, Edit, Save, X, Copy, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// Interface for structured report field (removed Sumber field)
+// Interface for structured report field - simple 4-column structure
 export interface ReportField {
   Section: string;
   Field: string;
   Value: string;
-  'Input Type': string;
-  'Knowledge Investigator': string;
+  Reason: string;
 }
 
 interface InvestigationReportDisplayProps {
@@ -155,8 +154,8 @@ export function InvestigationReportDisplay({
         return;
       }
 
-      // CSV export (without Sumber field)
-      const headers = ['Section', 'Field', 'Value', 'Input Type', 'Knowledge Investigator'];
+      // CSV export - 4 columns only
+      const headers = ['Section', 'Field', 'Value', 'Reason'];
       const csvRows = [
         headers.join(','),
         ...reportData.map(row => 
@@ -303,7 +302,7 @@ export function InvestigationReportDisplay({
                                   )}
                                 </TableCell>
                                 <TableCell className="align-top text-sm text-muted-foreground">
-                                  {field['Knowledge Investigator'] || '-'}
+                                  {field.Reason || '-'}
                                 </TableCell>
                               </TableRow>
                             );
