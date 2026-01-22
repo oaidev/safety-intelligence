@@ -25,14 +25,15 @@ interface InvestigationReportDisplayProps {
   onUpdate: (newReport: ReportField[] | string) => void;
 }
 
-// Updated section order with merged section
+// Updated section order matching BeInvestigasi structure (7 sections)
 const sectionOrder = [
   'Informasi Karyawan',
-  'Kejadian Kecelakaan / Berbahaya',
+  'Fakta Kecelakaan / Kejadian Berbahaya',
+  'Kejadian Singkat Kecelakaan / Kejadian Berbahaya',
   'PEEPO Analysis',
   'Daftar Pertanyaan Layer Investigasi',
-  'Root Cause Analysis',
-  'Rekomendasi Tindakan',
+  'Detail Layer & Pertanyaan',
+  'Detail Tindakan Perbaikan',
 ];
 
 export function InvestigationReportDisplay({
