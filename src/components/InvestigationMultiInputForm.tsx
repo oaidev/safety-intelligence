@@ -141,46 +141,44 @@ export function InvestigationMultiInputForm({ onGenerate, isGenerating }: Invest
   const totalFiles = Object.values(files).reduce((sum, arr) => sum + arr.length, 0);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-3">
+      {/* 4-column horizontal upload grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {FILE_SECTIONS.map(section => {
           const Icon = section.icon;
           const sectionFiles = files[section.id];
           
           return (
             <Card key={section.id} className="overflow-hidden">
-              <CardHeader className="py-3 px-4 bg-muted/30">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Icon className="h-4 w-4" />
+              <CardHeader className="py-2 px-3 bg-muted/30">
+                <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                  <Icon className="h-3.5 w-3.5" />
                   {section.label}
                   {section.required && <span className="text-destructive">*</span>}
                   {sectionFiles.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto">
+                    <Badge variant="secondary" className="ml-auto text-xs h-5">
                       {sectionFiles.length}
                     </Badge>
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3">
-                {/* File List */}
+              <CardContent className="p-2">
+                {/* File List - compact */}
                 {sectionFiles.length > 0 && (
-                  <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
+                  <div className="space-y-1 mb-2 max-h-20 overflow-y-auto">
                     {sectionFiles.map((file, idx) => (
                       <div
                         key={`${file.name}-${idx}`}
-                        className="flex items-center justify-between p-2 bg-secondary/50 rounded text-xs"
+                        className="flex items-center justify-between p-1.5 bg-secondary/50 rounded text-xs"
                       >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Icon className="h-3.5 w-3.5 text-primary shrink-0" />
-                          <span className="truncate">{file.name}</span>
-                          <span className="text-muted-foreground shrink-0">
-                            ({formatFileSize(file.size)})
-                          </span>
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <Icon className="h-3 w-3 text-primary shrink-0" />
+                          <span className="truncate text-xs">{file.name}</span>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 shrink-0"
+                          className="h-5 w-5 shrink-0"
                           onClick={() => handleFileRemove(section.id, idx)}
                         >
                           <X className="h-3 w-3" />
@@ -190,17 +188,20 @@ export function InvestigationMultiInputForm({ onGenerate, isGenerating }: Invest
                   </div>
                 )}
 
-                {/* Upload Area */}
+                {/* Upload Area - compact */}
                 <div
                   className={cn(
-                    "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
+                    "border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors",
                     "hover:border-primary hover:bg-primary/5"
                   )}
                   onClick={() => document.getElementById(`input-${section.id}`)?.click()}
                 >
-                  <Plus className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">
-                    {section.formats} • Max {section.maxSizeLabel}
+                  <Plus className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    {section.formats}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Max {section.maxSizeLabel}
                   </p>
                   <input
                     id={`input-${section.id}`}
@@ -217,17 +218,17 @@ export function InvestigationMultiInputForm({ onGenerate, isGenerating }: Invest
         })}
       </div>
 
-      {/* Summary & Generate Button */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-4">
+      {/* Summary & Generate Button - more compact */}
+      <Card className="p-3">
+        <div className="flex items-center justify-between gap-3">
           <div className="text-sm text-muted-foreground">
             {totalFiles === 0 ? (
               'Belum ada file yang diupload'
             ) : (
               <span>
-                <strong>{totalFiles}</strong> file siap diproses
+                <strong>{totalFiles}</strong> file siap
                 {files.audioFiles.length > 0 && ` (${files.audioFiles.length} audio`}
-                {files.documentFiles.length > 0 && `, ${files.documentFiles.length} dokumen`}
+                {files.documentFiles.length > 0 && `, ${files.documentFiles.length} dok`}
                 {files.imageFiles.length > 0 && `, ${files.imageFiles.length} foto`}
                 {files.videoFiles.length > 0 && `, ${files.videoFiles.length} video`}
                 {files.audioFiles.length > 0 && ')'}
@@ -237,7 +238,6 @@ export function InvestigationMultiInputForm({ onGenerate, isGenerating }: Invest
           <Button
             onClick={handleGenerate}
             disabled={files.audioFiles.length === 0 || isGenerating}
-            size="lg"
             className="shrink-0"
           >
             {isGenerating ? (

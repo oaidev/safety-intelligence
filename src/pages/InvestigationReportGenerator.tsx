@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { InvestigationMultiInputForm, type EvidenceFiles } from '@/components/InvestigationMultiInputForm';
 import { InvestigationProcessingPipeline, type ProcessingStep, type ThinkingMessage } from '@/components/InvestigationProcessingPipeline';
@@ -24,6 +24,10 @@ const InvestigationReportGenerator = () => {
   const [overallProgress, setOverallProgress] = useState(0);
   const [showPipeline, setShowPipeline] = useState(false);
   const { toast } = useToast();
+  
+  // Refs for auto-scroll
+  const pipelineRef = useRef<HTMLDivElement>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     whisperService.initializeInBackground();
@@ -100,6 +104,14 @@ const InvestigationReportGenerator = () => {
     setReportFormat('text');
     setThinkingMessages([]);
     setOverallProgress(0);
+    
+    // Auto-scroll to pipeline section
+    setTimeout(() => {
+      pipelineRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
 
     // Initialize steps
     const steps: ProcessingStep[] = [];
@@ -460,6 +472,14 @@ const InvestigationReportGenerator = () => {
                   if (data.thinkingProcess) {
                     setThinkingProcess(data.thinkingProcess);
                   }
+                  
+                  // Auto-scroll to report section when complete
+                  setTimeout(() => {
+                    reportRef.current?.scrollIntoView({ 
+                      behavior: 'smooth', 
+                      block: 'start' 
+                    });
+                  }, 300);
                 }
                 
                 if (data.error) {
@@ -510,54 +530,55 @@ const InvestigationReportGenerator = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4 lg:p-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl lg:text-3xl font-bold mb-1">Investigation Report Generator</h1>
-          <p className="text-muted-foreground text-sm lg:text-base">
+        {/* Header */}
+        <div className="text-center mb-4">
+          <h1 className="text-xl lg:text-2xl font-bold mb-1">Investigation Report Generator</h1>
+          <p className="text-muted-foreground text-sm">
             Generate comprehensive investigation report from audio, video, images, and documents
           </p>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Input Section */}
-          <div className="space-y-4">
-            <InvestigationMultiInputForm
-              onGenerate={handleGenerateWithSSE}
-              isGenerating={isGenerating}
-            />
-          </div>
+        {/* Vertical Flow Layout */}
+        <div className="space-y-4">
+          {/* Input Section - Full Width */}
+          <InvestigationMultiInputForm
+            onGenerate={handleGenerateWithSSE}
+            isGenerating={isGenerating}
+          />
 
-          {/* Output Section */}
-          <div className="space-y-4">
-            {showPipeline && isGenerating && (
+          {/* Processing Pipeline Section */}
+          {showPipeline && isGenerating && (
+            <div ref={pipelineRef} className="scroll-mt-4">
               <InvestigationProcessingPipeline
                 steps={processingSteps}
                 thinkingMessages={thinkingMessages}
                 overallProgress={overallProgress}
                 isComplete={!isGenerating && reportData !== null}
               />
-            )}
+            </div>
+          )}
 
-            {reportData ? (
-              <div className="space-y-4">
-                {thinkingProcess && (
-                  <ThinkingProcessViewer thinkingProcess={thinkingProcess} compact={false} />
-                )}
-                <InvestigationReportDisplay
-                  reportData={reportData}
-                  reportFormat={reportFormat}
-                  reportRaw={reportRaw}
-                  trackingId={trackingId}
-                  onUpdate={(newReport) => setReportData(newReport)}
-                />
-              </div>
-            ) : !isGenerating && (
-              <Card className="p-8 text-center border-dashed min-h-64 flex items-center justify-center">
-                <p className="text-muted-foreground">
-                  Laporan investigasi akan muncul di sini setelah proses selesai
-                </p>
-              </Card>
-            )}
-          </div>
+          {/* Report Results Section - Full Width */}
+          {reportData ? (
+            <div ref={reportRef} className="space-y-4 scroll-mt-4">
+              {thinkingProcess && (
+                <ThinkingProcessViewer thinkingProcess={thinkingProcess} compact={false} />
+              )}
+              <InvestigationReportDisplay
+                reportData={reportData}
+                reportFormat={reportFormat}
+                reportRaw={reportRaw}
+                trackingId={trackingId}
+                onUpdate={(newReport) => setReportData(newReport)}
+              />
+            </div>
+          ) : !isGenerating && !showPipeline && (
+            <Card className="p-6 text-center border-dashed">
+              <p className="text-muted-foreground text-sm">
+                Laporan investigasi akan muncul di sini setelah proses selesai
+              </p>
+            </Card>
+          )}
         </div>
       </div>
     </div>

@@ -7,6 +7,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Download, Edit, Save, X, Copy, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+// Alternating colors for sub-groups
+const groupColors = [
+  'bg-muted/40',
+  'bg-blue-50/60 dark:bg-blue-950/30',
+  'bg-green-50/60 dark:bg-green-950/30',
+  'bg-amber-50/60 dark:bg-amber-950/30',
+  'bg-purple-50/60 dark:bg-purple-950/30',
+];
 
 // Interface for structured report field - simple 4-column structure
 export interface ReportField {
@@ -285,13 +295,19 @@ export function InvestigationReportDisplay({
                         const hasMultipleGroups = subGroups.length > 1 || (subGroups.length === 1 && subGroups[0].label);
                         
                         return (
-                          <div className="space-y-4">
+                          <div className="space-y-3">
                             {subGroups.map((group, groupIdx) => (
-                              <div key={groupIdx}>
+                              <div 
+                                key={groupIdx}
+                                className={cn(
+                                  "rounded-lg overflow-hidden",
+                                  hasMultipleGroups && groupColors[groupIdx % groupColors.length]
+                                )}
+                              >
                                 {hasMultipleGroups && group.label && (
-                                  <div className="flex items-center gap-2 mb-2 py-2 border-b border-dashed">
-                                    <Badge variant="outline" className="text-xs font-medium">
-                                      {group.label === 'Korban' ? '👤' : group.label === 'Saksi' ? '👁' : '📋'} {group.label}
+                                  <div className="flex items-center gap-2 px-3 py-2 border-b bg-background/50">
+                                    <Badge variant="secondary" className="text-xs font-medium">
+                                      {group.label === 'Korban' ? '👤' : group.label === 'Saksi' ? '👁' : group.label.includes('Layer') ? '🔍' : '📋'} {group.label}
                                     </Badge>
                                   </div>
                                 )}
@@ -299,8 +315,8 @@ export function InvestigationReportDisplay({
                                   {groupIdx === 0 && (
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead className="w-[160px]">Field</TableHead>
-                                        <TableHead className="w-1/2">Value</TableHead>
+                                        <TableHead className="w-[140px]">Field</TableHead>
+                                        <TableHead className="w-[55%]">Value</TableHead>
                                         <TableHead className="w-[35%]">Reason</TableHead>
                                       </TableRow>
                                     </TableHeader>
@@ -314,8 +330,8 @@ export function InvestigationReportDisplay({
                                       const isEditingThis = editingField?.section === sectionName && editingField?.fieldIndex === globalIdx;
                                       
                                       return (
-                                        <TableRow key={idx}>
-                                          <TableCell className="font-medium align-top">
+                                        <TableRow key={idx} className={cn(hasMultipleGroups && "bg-transparent hover:bg-background/50")}>
+                                          <TableCell className="font-medium align-top text-sm">
                                             {field.Field}
                                           </TableCell>
                                           <TableCell className="align-top">
@@ -348,7 +364,7 @@ export function InvestigationReportDisplay({
                                               </div>
                                             ) : (
                                               <div className="group flex items-start gap-2">
-                                                <span className="whitespace-pre-wrap flex-1">
+                                                <span className="whitespace-pre-wrap flex-1 text-sm">
                                                   {field.Value || '-'}
                                                 </span>
                                                 <Button
@@ -362,7 +378,7 @@ export function InvestigationReportDisplay({
                                               </div>
                                             )}
                                           </TableCell>
-                                          <TableCell className="align-top text-sm text-muted-foreground">
+                                          <TableCell className="align-top text-xs text-muted-foreground">
                                             {field.Reason || '-'}
                                           </TableCell>
                                         </TableRow>
