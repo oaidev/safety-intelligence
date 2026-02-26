@@ -494,8 +494,8 @@ const InvestigationReportGenerator = () => {
       }
 
       toast({
-        title: 'Report generated!',
-        description: 'Investigation report with video analysis and PDF OCR complete',
+        title: 'Laporan berhasil dibuat!',
+        description: 'Laporan investigasi siap untuk ditinjau',
       });
 
     } catch (error: any) {
