@@ -249,7 +249,7 @@ async function processEvidence(options: ProcessOptions) {
       
       // Process PDF with Gemini Vision
       if (doc.format === 'pdf' && doc.base64) {
-        onProgress('documents', `OCR PDF: ${doc.name}...`);
+        onProgress('documents', `Membaca ${doc.name}...`);
         console.log(`[InvestigationReport] Processing PDF via Vision: ${doc.name}`);
         
         try {
@@ -290,7 +290,7 @@ async function processEvidence(options: ProcessOptions) {
             const pdfResult = await pdfResponse.json();
             const extractedText = pdfResult.choices?.[0]?.message?.content || '';
             pdfContents.push(`--- ${doc.name} (PDF OCR) ---\n${extractedText}`);
-            onProgress('documents', `Selesai OCR ${doc.name}`, { wordCount: extractedText.split(/\s+/).length });
+            onProgress('documents', `Selesai membaca ${doc.name}`, { wordCount: extractedText.split(/\s+/).length });
           } else {
             console.error(`[InvestigationReport] PDF OCR failed for ${doc.name}`);
           }
@@ -411,7 +411,7 @@ Berikan analisis menyeluruh dan profesional.`
   }
 
   console.log('[InvestigationReport] Combined context length:', combinedContext.length);
-  onProgress('analysis', 'Menyiapkan context untuk AI...', { contextLength: combinedContext.length });
+  onProgress('analysis', 'Menyiapkan analisis...', { contextLength: combinedContext.length });
 
   // Fetch prompt template
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -469,7 +469,7 @@ Buat laporan investigasi dengan format:
 
   // Add images
   if (imageFiles && imageFiles.length > 0) {
-    onProgress('analysis', `Menyertakan ${imageFiles.length} gambar untuk analisis visual...`);
+    onProgress('analysis', `Memproses ${imageFiles.length} gambar...`);
     
     for (const image of imageFiles) {
       const imageMimeType = image.fileName.endsWith('.png') ? 'image/png'
@@ -486,7 +486,7 @@ Buat laporan investigasi dengan format:
   }
 
   // Generate report
-  onProgress('analysis', 'AI menganalisis dan menyusun laporan investigasi...');
+  onProgress('analysis', 'Menyusun laporan investigasi...');
   console.log('[InvestigationReport] Calling AI for report generation...');
   
   const response = await fetch(
@@ -549,7 +549,25 @@ Buat laporan investigasi dengan format:
       jsonString = arrayMatch[0];
     }
     
-    reportData = JSON.parse(jsonString);
+    try {
+      reportData = JSON.parse(jsonString);
+    } catch {
+      // Try to fix truncated JSON by closing open brackets/braces
+      let fixed = jsonString;
+      const openBraces = (fixed.match(/{/g) || []).length;
+      const closeBraces = (fixed.match(/}/g) || []).length;
+      const openBrackets = (fixed.match(/\[/g) || []).length;
+      const closeBrackets = (fixed.match(/\]/g) || []).length;
+      
+      // Remove trailing comma if present
+      fixed = fixed.replace(/,\s*$/, '');
+      
+      for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
+      for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += ']';
+      
+      reportData = JSON.parse(fixed);
+      console.log('[InvestigationReport] Fixed truncated JSON successfully');
+    }
     
     // Validate it's an array with expected structure
     if (Array.isArray(reportData) && reportData.length > 0 && reportData[0].Section) {

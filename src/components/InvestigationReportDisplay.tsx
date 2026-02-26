@@ -57,12 +57,33 @@ export function InvestigationReportDisplay({
   const [editValue, setEditValue] = useState('');
   const { toast } = useToast();
 
+  // Fallback: try to parse text as JSON if it looks like a JSON array
+  const { parsedData, effectiveFormat } = useMemo(() => {
+    if (reportFormat === 'json' && Array.isArray(reportData)) {
+      return { parsedData: reportData as ReportField[], effectiveFormat: 'json' as const };
+    }
+    if (typeof reportData === 'string') {
+      try {
+        let jsonStr = reportData.trim();
+        const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+        const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
+        if (arrayMatch) jsonStr = arrayMatch[0];
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].Section) {
+          return { parsedData: parsed as ReportField[], effectiveFormat: 'json' as const };
+        }
+      } catch {}
+    }
+    return { parsedData: reportData, effectiveFormat: reportFormat };
+  }, [reportData, reportFormat]);
+
   // Group fields by section, then by sub-groups within sections
   const sections = useMemo(() => {
-    if (typeof reportData === 'string' || !Array.isArray(reportData)) {
+    if (typeof parsedData === 'string' || !Array.isArray(parsedData)) {
       return {};
     }
-    return reportData.reduce((acc, field) => {
+    return parsedData.reduce((acc, field) => {
       const section = field.Section || 'Lainnya';
       if (!acc[section]) acc[section] = [];
       acc[section].push(field);
@@ -122,7 +143,7 @@ export function InvestigationReportDisplay({
     });
   }, [sections]);
 
-  const isJsonFormat = reportFormat === 'json' && Array.isArray(reportData);
+  const isJsonFormat = effectiveFormat === 'json' && Array.isArray(parsedData);
 
   // Initialize all sections as expanded
   useMemo(() => {
@@ -152,13 +173,13 @@ export function InvestigationReportDisplay({
   };
 
   const saveFieldEdit = () => {
-    if (!editingField || !Array.isArray(reportData)) return;
+    if (!editingField || !Array.isArray(parsedData)) return;
 
     const sectionFields = sections[editingField.section];
     if (!sectionFields) return;
 
     const fieldToUpdate = sectionFields[editingField.fieldIndex];
-    const updatedReport = [...reportData];
+    const updatedReport = [...parsedData];
     const globalIndex = updatedReport.findIndex(
       f => f.Section === fieldToUpdate.Section && f.Field === fieldToUpdate.Field
     );
@@ -180,9 +201,9 @@ export function InvestigationReportDisplay({
   };
 
   const copyToClipboard = () => {
-    const content = Array.isArray(reportData) 
-      ? JSON.stringify(reportData, null, 2) 
-      : (typeof reportData === 'string' ? reportData : JSON.stringify(reportData, null, 2));
+    const content = Array.isArray(parsedData) 
+      ? JSON.stringify(parsedData, null, 2) 
+      : (typeof parsedData === 'string' ? parsedData : JSON.stringify(parsedData, null, 2));
     navigator.clipboard.writeText(content);
     toast({
       title: 'Disalin!',
@@ -192,9 +213,9 @@ export function InvestigationReportDisplay({
 
   const exportToCSV = () => {
     try {
-      if (!Array.isArray(reportData)) {
+      if (!Array.isArray(parsedData)) {
         // Export as text file
-        const blob = new Blob([reportRaw || (typeof reportData === 'string' ? reportData : '')], { type: 'text/plain' });
+        const blob = new Blob([reportRaw || (typeof parsedData === 'string' ? parsedData : '')], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -210,7 +231,7 @@ export function InvestigationReportDisplay({
       const headers = ['Section', 'Field', 'Value', 'Reason'];
       const csvRows = [
         headers.join(','),
-        ...reportData.map(row => 
+        ...(parsedData as ReportField[]).map(row => 
           headers.map(h => `"${(row[h as keyof ReportField] || '').toString().replace(/"/g, '""')}"`).join(',')
         )
       ];
@@ -247,7 +268,7 @@ export function InvestigationReportDisplay({
             <CardTitle>Laporan Investigasi</CardTitle>
             {isJsonFormat && (
               <Badge variant="secondary" className="text-xs">
-                {(reportData as ReportField[]).length} fields
+                {(parsedData as ReportField[]).length} fields
               </Badge>
             )}
           </div>
@@ -409,7 +430,7 @@ export function InvestigationReportDisplay({
               lineHeight: '1.6',
             }}
           >
-            {typeof reportData === 'string' ? reportData : JSON.stringify(reportData, null, 2)}
+            {typeof parsedData === 'string' ? parsedData : JSON.stringify(parsedData, null, 2)}
           </div>
         )}
       </CardContent>
