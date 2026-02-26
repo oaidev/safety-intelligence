@@ -1,38 +1,39 @@
 
 
-## Plan: Ubah Fungsi Button "Salin" ke Copy JSON
+## Plan: Hapus Detail Teknis dari Thinking Messages
+
+### Masalah
+Saat AI menganalisis, user melihat pesan teknis seperti:
+- "Menggunakan Whisper lokal untuk Audio.aac..."
+- "Mengekstrak teks dari DOCX: file.docx..."
+- "PDF akan diproses via OCR server: file.pdf..."
+- "Mengompresi dan menyiapkan foto bukti..."
+
+Ini melanggar prinsip **hide technical complexity** — user tidak perlu tahu teknologi yang dipakai.
 
 ### Perubahan
 
-**File:** `src/components/InvestigationReportDisplay.tsx`
+**File:** `src/pages/InvestigationReportGenerator.tsx`
 
-Ubah handler `copyToClipboard` agar meng-copy JSON format (`JSON.stringify(reportData, null, 2)`) alih-alih raw text/reportRaw.
+Ganti semua `addThinkingMessage` yang menyebut teknologi menjadi pesan sederhana:
 
-**Sebelum:**
-```typescript
-const copyToClipboard = () => {
-  const content = reportRaw || (typeof reportData === 'string' ? reportData : JSON.stringify(reportData, null, 2));
-  navigator.clipboard.writeText(content);
-  ...
-};
-```
+| Baris | Sebelum | Sesudah |
+|-------|---------|---------|
+| 177 | `Memulai transkripsi audio interview...` | `Memproses audio interview...` |
+| 195 | `Menggunakan Whisper lokal untuk ${file.name}...` | `Memproses ${file.name}...` |
+| 227 | `Mengekstrak konten dokumen...` | `Membaca dokumen...` |
+| 247 | `Mengekstrak teks dari DOCX: ${file.name}...` | `Membaca ${file.name}...` |
+| 258 | `Mengekstrak data dari Excel: ${file.name}...` | `Membaca ${file.name}...` |
+| 264 | `PDF akan diproses via OCR server: ${file.name}...` | `Membaca ${file.name}...` |
+| 298 | `Mengompresi dan menyiapkan foto bukti...` | `Menyiapkan foto bukti...` |
+| 339 | `Menyiapkan video: ${file.name}...` | `Memproses video ${file.name}...` |
+| 357 | `Mengirim data ke AI untuk analisis komprehensif...` | `Menganalisis seluruh bukti...` |
 
-**Sesudah:**
-```typescript
-const copyToClipboard = () => {
-  const content = Array.isArray(reportData) 
-    ? JSON.stringify(reportData, null, 2) 
-    : (typeof reportData === 'string' ? reportData : JSON.stringify(reportData, null, 2));
-  navigator.clipboard.writeText(content);
-  ...
-};
-```
-
-Prioritaskan JSON format ketika `reportData` adalah array (format structured), sehingga user selalu mendapat JSON standard saat klik "Salin".
+Total: **9 pesan** diubah menjadi bahasa non-teknis.
 
 ### File yang Diubah
 
 | File | Perubahan |
 |------|-----------|
-| `src/components/InvestigationReportDisplay.tsx` | Ubah `copyToClipboard` agar copy JSON |
+| `src/pages/InvestigationReportGenerator.tsx` | 9 string thinking message disederhanakan |
 
