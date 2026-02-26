@@ -356,6 +356,45 @@ export type Database = {
         }
         Relationships: []
       }
+      processor_cards: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          document_type: string
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          output_fields: Json
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          document_type: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          output_fields?: Json
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          document_type?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          output_fields?: Json
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -380,6 +419,42 @@ export type Database = {
           id?: string
           last_name?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      system_api_keys: {
+        Row: {
+          api_key_encrypted: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          model: string
+          priority: number | null
+          provider: string
+          rate_limit_per_minute: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_key_encrypted: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          model: string
+          priority?: number | null
+          provider: string
+          rate_limit_per_minute?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_key_encrypted?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          model?: string
+          priority?: number | null
+          provider?: string
+          rate_limit_per_minute?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -473,6 +548,105 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_logs: {
+        Row: {
+          action_type: string
+          ai_provider: string | null
+          created_at: string | null
+          credits_used: number | null
+          id: string
+          metadata: Json | null
+          tokens_used: number | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          ai_provider?: string | null
+          created_at?: string | null
+          credits_used?: number | null
+          id?: string
+          metadata?: Json | null
+          tokens_used?: number | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          ai_provider?: string | null
+          created_at?: string | null
+          credits_used?: number | null
+          id?: string
+          metadata?: Json | null
+          tokens_used?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          billing_cycle_end: string | null
+          billing_cycle_start: string | null
+          created_at: string | null
+          credits_monthly_limit: number | null
+          credits_remaining: number | null
+          id: string
+          is_active: boolean | null
+          plan_type: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          billing_cycle_end?: string | null
+          billing_cycle_start?: string | null
+          created_at?: string | null
+          credits_monthly_limit?: number | null
+          credits_remaining?: number | null
+          id?: string
+          is_active?: boolean | null
+          plan_type?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          billing_cycle_end?: string | null
+          billing_cycle_start?: string | null
+          created_at?: string | null
+          credits_monthly_limit?: number | null
+          credits_remaining?: number | null
+          id?: string
+          is_active?: boolean | null
+          plan_type?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -481,6 +655,13 @@ export type Database = {
       calculate_distance_km: {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
         Returns: number
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       similarity_search: {
         Args: { kb_id: string; match_count?: number; query_embedding: string }
@@ -507,7 +688,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -634,6 +815,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const

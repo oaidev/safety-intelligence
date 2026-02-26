@@ -180,7 +180,9 @@ export function InvestigationReportDisplay({
   };
 
   const copyToClipboard = () => {
-    const content = reportRaw || (typeof reportData === 'string' ? reportData : JSON.stringify(reportData, null, 2));
+    const content = Array.isArray(reportData) 
+      ? JSON.stringify(reportData, null, 2) 
+      : (typeof reportData === 'string' ? reportData : JSON.stringify(reportData, null, 2));
     navigator.clipboard.writeText(content);
     toast({
       title: 'Disalin!',
