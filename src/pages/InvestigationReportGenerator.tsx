@@ -174,7 +174,7 @@ const InvestigationReportGenerator = () => {
       // Step 1: Process Audio Files locally if possible
       if (files.audioFiles.length > 0) {
         updateStep('audio', { status: 'processing' });
-        addThinkingMessage('Memulai transkripsi audio interview...');
+        addThinkingMessage('Memproses audio interview...');
 
         for (let i = 0; i < files.audioFiles.length; i++) {
           const file = files.audioFiles[i];
@@ -192,7 +192,7 @@ const InvestigationReportGenerator = () => {
 
           if (whisperService.isModelReady()) {
             try {
-              addThinkingMessage(`Menggunakan Whisper lokal untuk ${file.name}...`);
+              addThinkingMessage(`Memproses ${file.name}...`);
               transcript = await whisperService.transcribeAudio(file);
               processedLocally = true;
             } catch (error) {
@@ -224,7 +224,7 @@ const InvestigationReportGenerator = () => {
       // Step 2: Process Documents (DOCX/TXT locally, PDF to server)
       if (files.documentFiles.length > 0) {
         updateStep('documents', { status: 'processing' });
-        addThinkingMessage('Mengekstrak konten dokumen...');
+        addThinkingMessage('Membaca dokumen...');
 
         for (let i = 0; i < files.documentFiles.length; i++) {
           const file = files.documentFiles[i];
@@ -244,7 +244,7 @@ const InvestigationReportGenerator = () => {
 
           try {
             if (format === 'docx') {
-              addThinkingMessage(`Mengekstrak teks dari DOCX: ${file.name}...`);
+              addThinkingMessage(`Membaca ${file.name}...`);
               const result = await documentProcessingService.extractFromDocx(file);
               content = result.text;
               wordCount = result.wordCount;
@@ -255,13 +255,13 @@ const InvestigationReportGenerator = () => {
               wordCount = result.wordCount;
               processedLocally = true;
             } else if (format === 'xlsx' || format === 'xls') {
-              addThinkingMessage(`Mengekstrak data dari Excel: ${file.name}...`);
+              addThinkingMessage(`Membaca ${file.name}...`);
               const result = await documentProcessingService.extractFromExcel(file);
               content = result.text;
               wordCount = result.wordCount;
               processedLocally = true;
             } else if (format === 'pdf') {
-              addThinkingMessage(`PDF akan diproses via OCR server: ${file.name}...`);
+              addThinkingMessage(`Membaca ${file.name}...`);
               // PDF will be processed server-side with Gemini Vision
               processedLocally = false;
             }
@@ -295,7 +295,7 @@ const InvestigationReportGenerator = () => {
       // Step 3: Prepare Images (with compression)
       if (files.imageFiles.length > 0) {
         updateStep('images', { status: 'processing' });
-        addThinkingMessage('Mengompresi dan menyiapkan foto bukti...');
+        addThinkingMessage('Menyiapkan foto bukti...');
 
         for (const file of files.imageFiles) {
           // Compress image to reduce payload size
@@ -336,7 +336,7 @@ const InvestigationReportGenerator = () => {
         }
 
         for (const file of validVideos) {
-          addThinkingMessage(`Menyiapkan video: ${file.name}...`);
+          addThinkingMessage(`Memproses video ${file.name}...`);
           const base64 = await fileToBase64(file);
           const video: ProcessedVideo = {
             fileName: file.name,
@@ -354,7 +354,7 @@ const InvestigationReportGenerator = () => {
 
       // Step 5: Call Edge Function with SSE
       updateStep('analysis', { status: 'processing' });
-      addThinkingMessage('Mengirim data ke AI untuk analisis komprehensif...');
+      addThinkingMessage('Menganalisis seluruh bukti...');
 
       // Build request payload
       const audioData = await Promise.all(
