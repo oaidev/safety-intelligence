@@ -1,106 +1,36 @@
 
 
-## Plan: Fix Toast Non-Teknis & Robust JSON Parsing
+## Plan: Maksimalkan Limit Upload Berdasarkan Gemini API
 
-### Masalah 1: Toast sukses masih teknikal
-Baris 496-499 di `InvestigationReportGenerator.tsx`:
-```
-title: 'Report generated!'
-description: 'Investigation report with video analysis and PDF OCR complete'
-```
-Harus diganti ke bahasa non-teknis.
+Berdasarkan limit terbaru Gemini API (Jan 2026): inline data hingga **100MB**, video hingga **2GB** via Files API.
 
-### Masalah 2: Output AI kadang tampil sebagai raw JSON (bukan table)
-Dari screenshot user, terlihat output ditampilkan sebagai teks `\`\`\`json [...]` — bukan tabel.
+### Limit Saat Ini vs Limit Baru
 
-**Root cause**: Di edge function (baris 536-567), parsing JSON bisa gagal jika:
-- AI output truncated (bracket tidak lengkap)
-- Format markdown tidak match regex
+| Tipe | Saat Ini | Baru | Referensi |
+|------|----------|------|-----------|
+| Audio | 100MB | **100MB** (tetap) | Gemini inline limit |
+| Foto | 10MB | **100MB** | Gemini inline limit |
+| Dokumen | 50MB | **100MB** | Gemini inline limit |
+| Video | 20MB | **100MB** | Gemini inline limit |
 
-Ketika parsing gagal, `reportFormat` jadi `'text'` dan raw JSON ditampilkan apa adanya.
-
-**Fix**: Tambahkan fallback JSON parsing di **client-side** (`InvestigationReportDisplay.tsx`). Jika `reportFormat === 'text'` tapi isi `reportData` terdeteksi sebagai JSON array valid, parse dan tampilkan sebagai tabel.
-
-### Masalah 3: SSE progress messages dari server masih teknikal
-Beberapa `onProgress` messages di edge function masih menyebut "OCR PDF", "via Vision", dll. Ini ditampilkan ke user via `addThinkingMessage(data.message)` (baris 430).
+Video bisa sampai 2GB via Files API, tapi karena edge function memproses inline (base64), limit praktis tetap 100MB.
 
 ### Perubahan
 
-**File 1:** `src/pages/InvestigationReportGenerator.tsx`
+**File 1:** `src/components/InvestigationMultiInputForm.tsx`
+- Foto: `10MB` → `100MB`
+- Dokumen: `50MB` → `100MB`
+- Video: `20MB` → `100MB`
 
-| Baris | Sebelum | Sesudah |
-|-------|---------|---------|
-| 497-498 | `title: 'Report generated!'` + `description: '...video analysis and PDF OCR complete'` | `title: 'Laporan berhasil dibuat!'` + `description: 'Laporan investigasi siap untuk ditinjau'` |
+**File 2:** `src/components/InvestigationInputForm.tsx`
+- Foto: `20MB` → `100MB`
 
-**File 2:** `src/components/InvestigationReportDisplay.tsx`
+**File 3:** `src/pages/InvestigationReportGenerator.tsx`
+- Payload limit: `50MB` → `200MB` (agar bisa menampung beberapa file besar sekaligus)
+- Update pesan error sesuai limit baru
 
-Tambahkan logic di awal component untuk mendeteksi dan memperbaiki kasus ketika `reportFormat === 'text'` tapi `reportData` sebenarnya adalah JSON string yang bisa di-parse:
+**File 4:** `src/components/AudioUploadStep.tsx`
+- Sudah 100MB, tidak perlu diubah
 
-```typescript
-// Di dalam component, sebelum render
-const { parsedData, effectiveFormat } = useMemo(() => {
-  if (reportFormat === 'json' && Array.isArray(reportData)) {
-    return { parsedData: reportData, effectiveFormat: 'json' as const };
-  }
-  
-  // Fallback: try to parse text as JSON if it looks like JSON
-  if (typeof reportData === 'string') {
-    try {
-      let jsonStr = reportData.trim();
-      // Remove markdown code blocks
-      const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
-      // Find JSON array
-      const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
-      if (arrayMatch) jsonStr = arrayMatch[0];
-      
-      const parsed = JSON.parse(jsonStr);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].Section) {
-        return { parsedData: parsed, effectiveFormat: 'json' as const };
-      }
-    } catch {}
-  }
-  
-  return { parsedData: reportData, effectiveFormat: reportFormat };
-}, [reportData, reportFormat]);
-```
-
-Lalu gunakan `parsedData` dan `effectiveFormat` sebagai pengganti `reportData` dan `reportFormat` di seluruh render.
-
-**File 3:** `supabase/functions/generate-investigation-report/index.ts`
-
-Sederhanakan SSE progress messages:
-
-| Baris | Sebelum | Sesudah |
-|-------|---------|---------|
-| 252 | `OCR PDF: ${doc.name}...` | `Membaca ${doc.name}...` |
-| 293 | `Selesai OCR ${doc.name}` | `Selesai membaca ${doc.name}` |
-| 414 | `Menyiapkan context untuk AI...` | `Menyiapkan analisis...` |
-| 472 | `Menyertakan ${n} gambar untuk analisis visual...` | `Memproses ${n} gambar...` |
-| 489 | `AI menganalisis dan menyusun laporan investigasi...` | `Menyusun laporan investigasi...` |
-
-### Juga perbaiki JSON parsing di edge function (baris 536-567)
-
-Tambahkan recovery untuk truncated JSON — coba perbaiki bracket yang tidak lengkap:
-
-```typescript
-// After initial parse fails, try to fix truncated JSON
-let jsonString = reportText.trim();
-// ... existing cleanup ...
-try {
-  reportData = JSON.parse(jsonString);
-} catch {
-  // Try to fix truncated JSON by closing open brackets
-  const fixedJson = fixTruncatedJson(jsonString);
-  reportData = JSON.parse(fixedJson);
-}
-```
-
-### File yang Diubah
-
-| File | Perubahan |
-|------|-----------|
-| `src/pages/InvestigationReportGenerator.tsx` | Toast sukses non-teknis |
-| `src/components/InvestigationReportDisplay.tsx` | Client-side fallback JSON parsing |
-| `supabase/functions/generate-investigation-report/index.ts` | SSE messages non-teknis + robust JSON parsing dengan truncation recovery |
+Total: 3 file diubah, 6 nilai limit diperbarui.
 
