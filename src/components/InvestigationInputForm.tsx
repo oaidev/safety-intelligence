@@ -42,7 +42,7 @@ export function InvestigationInputForm({ onGenerate, isGenerating }: Investigati
 
   const validateImageFile = (file: File): boolean => {
     const validFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 20 * 1024 * 1024; // 20MB
+    const maxSize = 100 * 1024 * 1024; // 100MB
 
     if (!validFormats.includes(file.type)) {
       toast({
@@ -56,7 +56,7 @@ export function InvestigationInputForm({ onGenerate, isGenerating }: Investigati
     if (file.size > maxSize) {
       toast({
         title: 'File terlalu besar',
-        description: 'Ukuran image maksimal 20MB',
+        description: 'Ukuran image maksimal 100MB',
         variant: 'destructive',
       });
       return false;
