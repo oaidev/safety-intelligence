@@ -155,12 +155,12 @@ const InvestigationReportGenerator = () => {
 
     // Check estimated payload size
     const estimatedSize = estimatePayloadSize(files);
-    const MAX_PAYLOAD_SIZE = 50 * 1024 * 1024; // 50MB limit
+    const MAX_PAYLOAD_SIZE = 200 * 1024 * 1024; // 200MB limit
     
     if (estimatedSize > MAX_PAYLOAD_SIZE) {
       toast({
-        title: 'Payload terlalu besar',
-        description: `Total file ~${Math.round(estimatedSize / (1024 * 1024))}MB melebihi batas 50MB. Kurangi ukuran atau jumlah file.`,
+        title: 'File terlalu besar',
+        description: `Total file ~${Math.round(estimatedSize / (1024 * 1024))}MB melebihi batas 200MB. Kurangi ukuran atau jumlah file.`,
         variant: 'destructive',
       });
       setIsGenerating(false);
