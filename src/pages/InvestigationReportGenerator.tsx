@@ -461,6 +461,26 @@ const InvestigationReportGenerator = () => {
                   if (data.reportFormat === 'json' && Array.isArray(data.report)) {
                     setReportData(data.report);
                     setReportFormat('json');
+                  } else if (typeof data.report === 'string') {
+                    // Fallback: try to parse string as JSON (handles markdown-wrapped responses)
+                    try {
+                      let jsonStr = data.report.trim();
+                      const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+                      if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+                      const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
+                      if (arrayMatch) jsonStr = arrayMatch[0];
+                      const parsed = JSON.parse(jsonStr);
+                      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].Section) {
+                        setReportData(parsed);
+                        setReportFormat('json');
+                      } else {
+                        setReportData(data.report);
+                        setReportFormat('text');
+                      }
+                    } catch {
+                      setReportData(data.report);
+                      setReportFormat('text');
+                    }
                   } else {
                     setReportData(data.report);
                     setReportFormat('text');
