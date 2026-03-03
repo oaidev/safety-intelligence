@@ -1,36 +1,38 @@
 
 
-## Plan: Maksimalkan Limit Upload Berdasarkan Gemini API
+## Plan: Fix Investigation Report JSON Parsing
 
-Berdasarkan limit terbaru Gemini API (Jan 2026): inline data hingga **100MB**, video hingga **2GB** via Files API.
-
-### Limit Saat Ini vs Limit Baru
-
-| Tipe | Saat Ini | Baru | Referensi |
-|------|----------|------|-----------|
-| Audio | 100MB | **100MB** (tetap) | Gemini inline limit |
-| Foto | 10MB | **100MB** | Gemini inline limit |
-| Dokumen | 50MB | **100MB** | Gemini inline limit |
-| Video | 20MB | **100MB** | Gemini inline limit |
-
-Video bisa sampai 2GB via Files API, tapi karena edge function memproses inline (base64), limit praktis tetap 100MB.
+### Root Cause
+Dari log terbaru, error masih terjadi di line 473 (kode lama) — artinya edge function belum terdeploy dengan kode parsing baru. Selain itu, perlu memperkuat client-side fallback sebagai jaring pengaman kedua.
 
 ### Perubahan
 
-**File 1:** `src/components/InvestigationMultiInputForm.tsx`
-- Foto: `10MB` → `100MB`
-- Dokumen: `50MB` → `100MB`
-- Video: `20MB` → `100MB`
+**File 1: `supabase/functions/generate-investigation-report/index.ts`**
 
-**File 2:** `src/components/InvestigationInputForm.tsx`
-- Foto: `20MB` → `100MB`
+Masalah utama: AI Gemini mengembalikan response dengan wrapper ` ```json ... ``` `. Parsing di server sudah benar di kode saat ini, tapi belum terdeploy. Akan:
+- Redeploy edge function
+- Tambahkan instruksi eksplisit di prompt agar AI **tidak** mengembalikan markdown code blocks — hanya raw JSON array
 
-**File 3:** `src/pages/InvestigationReportGenerator.tsx`
-- Payload limit: `50MB` → `200MB` (agar bisa menampung beberapa file besar sekaligus)
-- Update pesan error sesuai limit baru
+Tambahkan di prompt sebelum `{CONTEXT}`:
+```
+PENTING: Kembalikan HANYA JSON array tanpa markdown code blocks. Jangan gunakan ```json atau ``` pembungkus. Langsung mulai dengan [ dan akhiri dengan ].
+```
 
-**File 4:** `src/components/AudioUploadStep.tsx`
-- Sudah 100MB, tidak perlu diubah
+**File 2: `src/components/InvestigationReportDisplay.tsx`**
 
-Total: 3 file diubah, 6 nilai limit diperbarui.
+Client-side fallback sudah ada tapi perlu diperkuat:
+- Tambahkan handling untuk kasus `reportData` berupa string tapi `reportFormat` sudah `'json'` (edge case)
+- Pastikan dependency array `useMemo` sections menggunakan `parsedData` bukan `reportData`
+
+**File 3: `src/pages/InvestigationReportGenerator.tsx`**
+
+Di handler SSE `data.report`, tambahkan fallback parsing client-side langsung sebelum `setReportData` — jika `reportFormat === 'text'` tapi `data.report` string yang berisi JSON valid, parse dulu baru set sebagai JSON.
+
+### File yang Diubah
+
+| File | Perubahan |
+|------|-----------|
+| `supabase/functions/generate-investigation-report/index.ts` | Tambah instruksi prompt "no markdown wrapping" + redeploy |
+| `src/components/InvestigationReportDisplay.tsx` | Fix dependency array useMemo |
+| `src/pages/InvestigationReportGenerator.tsx` | Tambah fallback JSON parsing di SSE handler sebelum setReportData |
 
