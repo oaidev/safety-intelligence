@@ -88,8 +88,8 @@ export function InvestigationReportDisplay({
       if (!acc[section]) acc[section] = [];
       acc[section].push(field);
       return acc;
-    }, {} as Record<string, ReportField[]>);
-  }, [reportData]);
+  }, {} as Record<string, ReportField[]>);
+  }, [parsedData]);
 
   // Detect sub-groups within sections (e.g., Korban/Saksi in Informasi Karyawan)
   const getSubGroups = (sectionFields: ReportField[]): { label: string; fields: ReportField[] }[] => {

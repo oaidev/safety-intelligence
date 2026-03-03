@@ -460,7 +460,11 @@ Buat laporan investigasi dengan format:
     promptTemplate = promptData.prompt_template;
   }
 
-  const promptText = promptTemplate.replace('{TRANSCRIPT}', combinedContext).replace('{CONTEXT}', combinedContext);
+  // Add explicit instruction to avoid markdown wrapping
+  const noMarkdownInstruction = `\n\nPENTING: Kembalikan HANYA JSON array tanpa markdown code blocks. Jangan gunakan \`\`\`json atau \`\`\` pembungkus. Langsung mulai dengan [ dan akhiri dengan ]. Jangan tambahkan teks apapun sebelum [ atau setelah ].`;
+  
+  let promptText = promptTemplate.replace('{TRANSCRIPT}', combinedContext).replace('{CONTEXT}', combinedContext);
+  promptText += noMarkdownInstruction;
 
   // Build multimodal message
   const messageContent: any[] = [
